@@ -2,8 +2,10 @@
 session_start();
 require_once "db.php";
 
-$data = json_decode(file_get_contents("php://input"), true);
+$data    = json_decode(file_get_contents("php://input"), true);
 $message = strtolower(trim($data["message"] ?? ""));
+$cart    = $data["cart"] ?? [];
+$page    = $data["page"] ?? "";
 
 $reply = "I'm not sure I understood that. Can you rephrase?";
 
@@ -21,6 +23,25 @@ elseif (str_contains($message, "order") || str_contains($message, "package") || 
 }
 elseif (str_contains($message, "help")) {
     $reply = "Sure! I can help you with products, orders, or general questions.";
+}
+// Sepetle ilgili soru
+elseif (str_contains($message, "cart") || str_contains($message, "basket")) {
+    if (!empty($cart)) {
+        $count = 0;
+        $names = [];
+        foreach ($cart as $item) {
+            $count += $item["qty"] ?? 1;
+            $names[] = $item["name"] ?? "item";
+        }
+        $uniqueNames = implode(", ", array_unique($names));
+        $reply = "You currently have {$count} item(s) in your cart: {$uniqueNames}.";
+    } else {
+        $reply = "Your cart looks empty right now. You can add products from the product cards.";
+    }
+}
+// Basit ürün önerisi
+elseif (str_contains($message, "recommend") || str_contains($message, "suggest")) {
+    $reply = "Looking for recommendations? On the home page we highlight featured products, and on the Products page you can filter by category and price.";
 }
 
 // LOG TO DB

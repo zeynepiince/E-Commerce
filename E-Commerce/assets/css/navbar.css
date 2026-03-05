@@ -21,7 +21,7 @@
 .logo{
   font-size:22px;
   font-weight:700;
-  color:#0f766e;
+  color:#ff6f00;
   letter-spacing:1.6px;
 }
 
@@ -39,7 +39,7 @@
 }
 
 .nav-categories a:hover{
-  color:#0f766e;
+  color:#ff6f00;
 }
 
 /* RIGHT */
@@ -56,12 +56,12 @@
 }
 
 .nav-action:hover{
-  color:#0f766e;
+  color:#ff6f00;
 }
 
 .nav-action.highlight{
   font-weight:600;
-  color:#0f766e;
+  color:#ff6f00;
 }
 
 /* SEARCH */
@@ -83,5 +83,6 @@
 
 .nav-search:focus{
   width:220px;
-  border-color:#0f766e;
+  border-color:#ff6f00;
 }
+
