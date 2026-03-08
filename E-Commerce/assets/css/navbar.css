@@ -11,6 +11,11 @@
   z-index:50;
 }
 
+.logo{
+  text-decoration:none;
+  color:inherit;
+}
+
 /* LEFT */
 .header-left{
   display:flex;
@@ -64,6 +69,11 @@
   color:#ff6f00;
 }
 
+.header-right a.nav-action{
+  text-decoration:none;
+  color:inherit;
+}
+
 /* SEARCH */
 .nav-search{
   width:160px;
@@ -84,5 +94,46 @@
 .nav-search:focus{
   width:220px;
   border-color:#ff6f00;
+}
+
+/* Hamburger - hidden on desktop */
+.nav-hamburger{
+  display:none;
+  background:none;
+  border:none;
+  font-size:24px;
+  cursor:pointer;
+  padding:8px;
+  color:#374151;
+}
+
+@media (max-width: 900px){
+  .nav-hamburger{
+    display:block;
+  }
+  .nav-categories{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:#fff;
+    flex-direction:column;
+    padding:20px;
+    gap:12px;
+    border-bottom:1px solid #e5e7eb;
+    display:none;
+  }
+  .nav-categories.nav-categories--open{
+    display:flex;
+  }
+  .elegant-header{
+    padding:14px 24px;
+  }
+  .header-left{
+    gap:20px;
+  }
+  .nav-search{
+    display:none;
+  }
 }
 

@@ -1,19 +1,24 @@
 <?php
 require_once 'functions.php';
 
-$page_title = "Wishlist – STORY";
+$page_title = "My Wishlist – STORY";
 ?>
 
 <?php include 'includes/header.php'; ?>
 
-<section class="products">
-  <h3>Your wishlist</h3>
-  <p class="subtitle">
-    Items you’ve saved for later. Move them to your cart when you’re ready.
-  </p>
+<link rel="stylesheet" href="assets/css/wishlist.css">
 
-  <div id="wishlistContainer"></div>
-</section>
+<div class="wishlist-page">
+  <div class="wishlist-container">
+    <header class="wishlist-header">
+      <h1 class="wishlist-title">
+        My Wishlist <span class="wishlist-title-count" id="wishlistCount"></span>
+      </h1>
+      <p class="wishlist-subtitle">Products you saved for later</p>
+    </header>
+
+    <div id="wishlistContainer"></div>
+  </div>
+</div>
 
 <?php include 'includes/footer.php'; ?>
-
