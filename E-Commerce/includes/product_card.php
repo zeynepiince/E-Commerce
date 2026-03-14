@@ -41,6 +41,17 @@ if (isset($badges) && is_array($badges)) {
     <p class="product-card-desc"><?= htmlspecialchars($productDesc, ENT_QUOTES, 'UTF-8') ?></p>
     <p class="product-card-price">$<?= number_format($productPrice, 2) ?></p>
     <p class="product-card-meta"><?= htmlspecialchars($seller, ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($shipping, ENT_QUOTES, 'UTF-8') ?></p>
-    <button type="button" class="product-card-add" onclick="addToCart(<?= $productId ?>,<?= json_encode($productName) ?>,<?= $productPrice ?>,<?= json_encode($imageUrl) ?>)">Add to Cart</button>
+    <button 
+      type="button"
+      class="product-card-add"
+      onclick='addToCart(
+      <?= $productId ?>,
+      <?= json_encode($productName) ?>,
+      <?= $productPrice ?>,
+      <?= json_encode($imageUrl) ?>
+      )'>
+      Add to Cart
+    </button>
+
   </div>
 </div>

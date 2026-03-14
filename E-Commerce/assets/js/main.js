@@ -174,7 +174,7 @@ function toggleFavorite(id, name, imageUrl) {
       id,
       name,
       imageUrl: imageUrl || null,
-      price: null,
+      price: typeof price === "number" ? price : 0,
       seller: "STORY Partner",
       shipping: "Free shipping",
       qty: 1,
@@ -682,7 +682,7 @@ function goToCheckout() {
     return;
   }
   saveCart();
-  window.location.href = "/chatbotv2/E-Commerce/checkout.php";
+  window.location.href = "/E-Commerce/checkout.php";
 }
 
 function checkout() {

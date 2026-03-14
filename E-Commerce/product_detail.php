@@ -1,14 +1,23 @@
 <?php
 require_once 'functions.php';
 
-// Basit örnek: ?name= ile ürün detayı (tabloda id kolonu olmadığı varsayımıyla)
+// Basit örnek: ?name= ile ürün detayı
 $productName = isset($_GET['name']) ? trim($_GET['name']) : null;
 $product   = null;
 
 if ($productName) {
     $stmt = $pdo->prepare("SELECT name, price, image_url FROM products WHERE name = ?");
     $stmt->execute([$productName]);
-    $product = $stmt->fetch();
+    $dbProduct = $stmt->fetch();
+
+    if ($dbProduct) {
+        $product = [
+            'name' => $dbProduct['name'],
+            'price' => $dbProduct['price'],
+            'image_url' => $dbProduct['image_url'],
+            'likes' => rand(10, 100) // placeholder beğeni sayısı
+        ];
+    }
 }
 
 $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail – STORY";
@@ -33,12 +42,19 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
         >
           ♡
         </button>
-        <img src="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>">
+        <img 
+          src="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>" 
+          alt="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>" 
+          style="max-width:400px; max-height:400px; object-fit:contain; display:block; margin:auto;"
+        >
       </div>
       <div class="product-detail-info">
         <h3><?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?></h3>
         <p class="product-detail-price">
           $<?= htmlspecialchars($product['price'], ENT_QUOTES, 'UTF-8') ?>
+        </p>
+        <p class="product-detail-likes">
+          <?= $product['likes'] ?> people liked this
         </p>
         <p class="product-detail-description">
           <?= htmlspecialchars('Carefully selected for your daily style and comfort.', ENT_QUOTES, 'UTF-8') ?>
@@ -60,7 +76,12 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
         <button
           class="btn-full-width"
           style="max-width:260px;"
-          onclick="addToCart(<?= (int) $cartId ?>,'<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',<?= (float) $product['price'] ?>,'<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>')"
+          onclick="addToCart(
+            <?= (int) $cartId ?>,
+            '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
+            <?= (float) $product['price'] ?>,
+            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>'
+          )"
         >
           Add to Cart
         </button>
@@ -90,4 +111,3 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
-
