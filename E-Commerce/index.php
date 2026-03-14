@@ -7,6 +7,9 @@ $featuredProducts   = get_featured_products($pdo);
 $forYouProducts     = get_random_products($pdo, 4);
 $bestSellerProducts = get_random_products($pdo, 4);
 $dealProducts       = get_random_products($pdo, 4);
+
+$selectedCategory = $_GET['category'] ?? '';
+$selectedSubCategory = $_GET['sub_category'] ?? '';
 ?>
 
 <?php include 'includes/header.php'; ?>
@@ -14,176 +17,45 @@ $dealProducts       = get_random_products($pdo, 4);
 <!-- Categories (navbar altında, hover ile alt kategoriler) -->
 <section class="categories-section categories-nav-section">
   <nav class="categories-nav" id="categoriesNav">
-    <div class="categories-nav-item">
-      <a href="products.php?category=women" class="categories-nav-label">Women</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=dress">Dress</a>
-        <a href="products.php?category=blouse">Blouse</a>
-        <a href="products.php?category=skirts">Skirts</a>
-        <a href="products.php?category=women-accessories">Accessories</a>
-        <a href="products.php?category=women-shoes">Shoes</a>
-        <a href="products.php?category=bags">Bags</a>
+    <?php
+    // Kategoriler ve alt kategoriler
+    $categories = [
+        'women' => ['dress','blouse','skirts','women-accessories','women-shoes','bags'],
+        'men' => ['shirt','pants','jacket','men-shoes','men-accessories'],
+        'electronics' => ['computer-tablet','printer','phone','tv','speakers','camera'],
+        'home' => ['furniture','decor','kitchen','bedding'],
+        'beauty' => ['skincare','makeup','hair','perfume'],
+        'sports' => ['fitness','outdoor','running','cycling'],
+        'kids' => ['kids-clothing','kids-toys','games','school'],
+        'toys' => ['action-figures','puzzles','board-games','educational-toys'],
+        'gadgets' => ['smartwatch','headphones','smart-home','gadgets-accessories'],
+        'books' => ['fiction','non-fiction','kids-books','education'],
+        'jewelry' => ['rings','necklaces','bracelets','earrings','watches'],
+        'pet' => ['dog','cat','pet-food','pet-toys'],
+        'auto' => ['car-accessories','car-care','car-electronics'],
+        'office' => ['stationery','desk','office-supplies'],
+        'garden' => ['outdoor-plants','garden-tools','outdoor-furniture'],
+        'health' => ['vitamins','wellness','medical'],
+        'baby' => ['baby-clothing','baby-care','baby-toys'],
+        'food' => ['snacks','beverages','gourmet'],
+        'arts' => ['craft-supplies','art-materials','sewing']
+    ];
+
+    foreach ($categories as $cat => $subCats):
+    ?>
+      <div class="categories-nav-item">
+        <a href="products.php?category=<?= $cat ?>" class="categories-nav-label <?= $selectedCategory === $cat ? 'active' : '' ?>">
+          <?= ucfirst($cat) ?>
+        </a>
+        <div class="categories-nav-sub">
+          <?php foreach ($subCats as $sub): ?>
+            <a href="products.php?category=<?= $cat ?>&sub_category=<?= $sub ?>" class="<?= $selectedSubCategory === $sub ? 'active' : '' ?>">
+              <?= str_replace('-', ' ', ucwords($sub)) ?>
+            </a>
+          <?php endforeach; ?>
+        </div>
       </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=men" class="categories-nav-label">Men</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=shirt">Shirt</a>
-        <a href="products.php?category=pants">Pants</a>
-        <a href="products.php?category=jacket">Jacket</a>
-        <a href="products.php?category=men-shoes">Shoes</a>
-        <a href="products.php?category=men-accessories">Accessories</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=electronics" class="categories-nav-label">Electronics</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=computer-tablet">Computer & Tablet</a>
-        <a href="products.php?category=printer">Printer</a>
-        <a href="products.php?category=phone">Phone</a>
-        <a href="products.php?category=tv">TV</a>
-        <a href="products.php?category=speakers">Speakers</a>
-        <a href="products.php?category=camera">Camera</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=home" class="categories-nav-label">Home</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=furniture">Furniture</a>
-        <a href="products.php?category=decor">Decor</a>
-        <a href="products.php?category=kitchen">Kitchen</a>
-        <a href="products.php?category=bedding">Bedding</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=beauty" class="categories-nav-label">Beauty</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=skincare">Skincare</a>
-        <a href="products.php?category=makeup">Makeup</a>
-        <a href="products.php?category=hair">Hair</a>
-        <a href="products.php?category=perfume">Perfume</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=sports" class="categories-nav-label">Sports</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=fitness">Fitness</a>
-        <a href="products.php?category=outdoor">Outdoor</a>
-        <a href="products.php?category=running">Running</a>
-        <a href="products.php?category=cycling">Cycling</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=kids" class="categories-nav-label">Kids</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=kids-clothing">Clothing</a>
-        <a href="products.php?category=kids-toys">Toys</a>
-        <a href="products.php?category=games">Games</a>
-        <a href="products.php?category=school">School</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=toys" class="categories-nav-label">Toys</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=action-figures">Action Figures</a>
-        <a href="products.php?category=puzzles">Puzzles</a>
-        <a href="products.php?category=board-games">Board Games</a>
-        <a href="products.php?category=educational-toys">Educational</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=gadgets" class="categories-nav-label">Gadgets</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=smartwatch">Smartwatch</a>
-        <a href="products.php?category=headphones">Headphones</a>
-        <a href="products.php?category=smart-home">Smart Home</a>
-        <a href="products.php?category=gadgets-accessories">Accessories</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=books" class="categories-nav-label">Books</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=fiction">Fiction</a>
-        <a href="products.php?category=non-fiction">Non-Fiction</a>
-        <a href="products.php?category=kids-books">Kids Books</a>
-        <a href="products.php?category=education">Education</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=jewelry" class="categories-nav-label">Jewelry</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=rings">Rings</a>
-        <a href="products.php?category=necklaces">Necklaces</a>
-        <a href="products.php?category=bracelets">Bracelets</a>
-        <a href="products.php?category=earrings">Earrings</a>
-        <a href="products.php?category=watches">Watches</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=pet" class="categories-nav-label">Pet</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=dog">Dog</a>
-        <a href="products.php?category=cat">Cat</a>
-        <a href="products.php?category=pet-food">Food</a>
-        <a href="products.php?category=pet-toys">Toys</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=auto" class="categories-nav-label">Auto</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=car-accessories">Accessories</a>
-        <a href="products.php?category=car-care">Care</a>
-        <a href="products.php?category=car-electronics">Electronics</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=office" class="categories-nav-label">Office</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=stationery">Stationery</a>
-        <a href="products.php?category=desk">Desk</a>
-        <a href="products.php?category=office-supplies">Supplies</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=garden" class="categories-nav-label">Garden</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=outdoor-plants">Plants</a>
-        <a href="products.php?category=garden-tools">Tools</a>
-        <a href="products.php?category=outdoor-furniture">Furniture</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=health" class="categories-nav-label">Health</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=vitamins">Vitamins</a>
-        <a href="products.php?category=wellness">Wellness</a>
-        <a href="products.php?category=medical">Medical</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=baby" class="categories-nav-label">Baby</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=baby-clothing">Clothing</a>
-        <a href="products.php?category=baby-care">Care</a>
-        <a href="products.php?category=baby-toys">Toys</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=food" class="categories-nav-label">Food & Drink</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=snacks">Snacks</a>
-        <a href="products.php?category=beverages">Beverages</a>
-        <a href="products.php?category=gourmet">Gourmet</a>
-      </div>
-    </div>
-    <div class="categories-nav-item">
-      <a href="products.php?category=arts" class="categories-nav-label">Arts & Crafts</a>
-      <div class="categories-nav-sub">
-        <a href="products.php?category=craft-supplies">Supplies</a>
-        <a href="products.php?category=art-materials">Art Materials</a>
-        <a href="products.php?category=sewing">Sewing</a>
-      </div>
-    </div>
+    <?php endforeach; ?>
   </nav>
 </section>
 

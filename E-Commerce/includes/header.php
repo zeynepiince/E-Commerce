@@ -38,7 +38,10 @@ $loggedInName = $_SESSION['user_name'] ?? null;
       <a href="wishlist.php">Wishlist</a>
     </nav>
 
-    <input type="text" class="nav-search" placeholder="Search" />
+    <form action="products.php" method="get" class="nav-search-form">
+      <input type="text" name="q" class="nav-search" placeholder="Search products..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
+    </form>
+
   </div>
 
   <div class="header-right">

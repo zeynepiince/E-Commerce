@@ -132,8 +132,40 @@
   .header-left{
     gap:20px;
   }
-  .nav-search{
-    display:none;
+  /* Search form container */
+.nav-search-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+/* Input alanı */
+.nav-search-form .nav-search {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db; /* gri sınır */
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 180px; /* genişliği ayarlayabilirsin */
+}
+
+.nav-search-form .nav-search:focus {
+  border-color: #6366f1; /* odaklanınca mor */
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Responsive küçük ekranlarda */
+@media (max-width: 640px) {
+  .nav-search-form {
+    width: 100%;
   }
+  .nav-search-form .nav-search {
+    flex: 1;
+    width: auto;
+  }
+}
+
 }
 

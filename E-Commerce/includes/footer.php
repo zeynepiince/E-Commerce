@@ -1,28 +1,96 @@
 <footer class="site-footer">
   <div class="footer-inner">
+
+    <!-- Support -->
     <div class="footer-col">
       <h5>Support</h5>
-      <a href="#">Help center</a>
-      <a href="#">Shipping & returns</a>
-      <a href="#">FAQ</a>
+      <div class="footer-link-group">
+        <a href="#" onclick="toggleFooterInfo(event, 'help')">Help Center</a>
+        <div id="help" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Find guides, FAQs, and support articles to help you with orders, shipping, and returns.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'shipping')">Shipping & Returns</a>
+        <div id="shipping" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Learn about shipping options, delivery times, and our return policy.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'faq')">FAQ</a>
+        <div id="faq" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Answers to common questions about products, accounts, and payments.</p>
+        </div>
+      </div>
     </div>
+
+    <!-- About -->
     <div class="footer-col">
       <h5>About</h5>
-      <a href="#">Our story</a>
-      <a href="#">Careers</a>
-      <a href="#">Contact</a>
+      <div class="footer-link-group">
+        <a href="#" onclick="toggleFooterInfo(event, 'ourStory')">Our Story</a>
+        <div id="ourStory" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Learn how STORY started, our mission, and what inspires our collections.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'careers')">Careers</a>
+        <div id="careers" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Explore career opportunities and join our team in shaping the STORY experience.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'contact')">Contact</a>
+        <div id="contact" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Get in touch with our support team for questions or feedback.</p>
+        </div>
+      </div>
     </div>
+
+    <!-- Follow -->
     <div class="footer-col">
       <h5>Follow</h5>
-      <a href="#">Instagram</a>
-      <a href="#">Twitter</a>
-      <a href="#">Facebook</a>
+      <div class="footer-link-group">
+        <a href="#" onclick="toggleFooterInfo(event, 'instagram')">Instagram</a>
+        <div id="instagram" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Follow us on Instagram for the latest product drops, promotions, and stories.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'twitter')">Twitter</a>
+        <div id="twitter" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Stay updated with news, product announcements, and community highlights on Twitter.</p>
+        </div>
+
+        <a href="#" onclick="toggleFooterInfo(event, 'facebook')">Facebook</a>
+        <div id="facebook" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
+          <p>Join our Facebook community to share feedback, reviews, and connect with other fans.</p>
+        </div>
+      </div>
     </div>
+
+    <!-- Copyright -->
     <div class="footer-col">
       <p>&copy; <?= date('Y') ?> STORY. All rights reserved.</p>
     </div>
+
   </div>
 </footer>
+
+<script>
+function toggleFooterInfo(e, id) {
+  e.preventDefault();
+
+  // Tüm footer-info bloklarını kapat
+  const allInfos = document.querySelectorAll('.footer-info');
+  allInfos.forEach(info => {
+    if (info.id !== id) {
+      info.style.display = 'none';
+    }
+  });
+
+  // Tıklananı aç/kapat
+  const info = document.getElementById(id);
+  info.style.display = (info.style.display === 'none') ? 'block' : 'none';
+}
+</script>
+
+
 
 <button class="chat-toggle" onclick="toggleChat()">💬</button>
 
