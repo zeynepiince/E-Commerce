@@ -1,10 +1,9 @@
 <?php
-$cartId = isset($product['name']) ? abs(crc32($product['name'])) : (($idx ?? 0) + 1);
-$productId = (int) ($cartId ?: (($idx ?? 0) + 1));
+$productId = (int) ($product['product_id'] ?? (($idx ?? 0) + 1));
 $imageUrl = !empty($product['image_url']) ? $product['image_url'] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff';
 $productName = $product['name'] ?? 'Product';
 $productPrice = (float) ($product['price'] ?? 0);
-$productCategory = $product['category'] ?? '';
+$productCategory = $product['category_name'] ?? '';
 $productDesc = $product['description'] ?? $productCategory ? "Premium {$productCategory} from our collection." : "Quality product from STORY.";
 $seller = $product['seller'] ?? 'STORY Partner';
 $shipping = $product['shipping'] ?? 'Free shipping';
@@ -16,7 +15,16 @@ if (isset($badges) && is_array($badges)) {
 }
 ?>
 <div class="product-card">
-  <button type="button" class="product-card-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>">♡</button>
+  <button 
+  type="button" 
+  class="product-card-wishlist wishlist-btn" 
+  data-id="<?= $productId ?>" 
+  data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" 
+  data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>"
+  data-price="<?= htmlspecialchars((string)$productPrice, ENT_QUOTES, 'UTF-8') ?>"
+>
+  ♡
+</button>
   <a href="product_detail.php?name=<?= urlencode($productName) ?>" class="product-card-link">
     <?php if (!empty($badgeList)): ?>
       <div class="product-card-badges">

@@ -199,7 +199,7 @@ function toggleFooterInfo(e, id) {
   </button>
 </div>
 
-<script src="assets/js/main.js"></script>
+<script src="assets/js/main.js?v=99"></script>
 <?php if (isset($is_homepage) && $is_homepage): ?>
 <script src="assets/js/homepage.js"></script>
 <?php endif; ?>
