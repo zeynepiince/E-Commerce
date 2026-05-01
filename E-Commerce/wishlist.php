@@ -2,6 +2,30 @@
 require_once 'functions.php';
 
 $page_title = "My Wishlist – STORY";
+
+$favorites = [];
+
+if (!empty($_SESSION['user_id'])) {
+    $user_id = (int) $_SESSION['user_id'];
+
+    $stmt = $pdo->prepare("
+        SELECT 
+            p.product_id,
+            p.name,
+            p.price,
+            p.image_url,
+            p.badges,
+            c.category_name AS category
+        FROM user_favorites uf
+        JOIN products p ON uf.product_id = p.product_id
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE uf.user_id = ?
+        ORDER BY uf.created_at DESC
+    ");
+
+    $stmt->execute([$user_id]);
+    $favorites = $stmt->fetchAll();
+}
 ?>
 
 <?php include 'includes/header.php'; ?>

@@ -35,8 +35,8 @@ if ($orders) {
             $oid = $row['order_id'];
             if (!isset($orderItemsByOrder[$oid])) $orderItemsByOrder[$oid] = [];
             $orderItemsByOrder[$oid][] = array_merge($row, [
-                'name' => $row['name'] ?? 'Product',
-                'image_url' => $row['image_url'] ?? 'https://images.unsplash.com/photo-1542291026-7eec264c27ff'
+                'name' => !empty($row['name']) ? $row['name'] : 'Deleted Product',
+                'image_url' => !empty($row['image_url']) ? $row['image_url'] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff'
             ]);
         }
     } catch (PDOException $e) {
@@ -82,8 +82,7 @@ $page_title = "Your Orders – STORY";
 
     <div class="orders-status-legend">
       <span class="orders-legend-item orders-legend--pending">Pending</span>
-      <span class="orders-legend-item orders-legend--shipped">Shipped</span>
-      <span class="orders-legend-item orders-legend--delivered">Delivered</span>
+      <span class="orders-legend-item orders-legend--completed">Completed</span>
       <span class="orders-legend-item orders-legend--cancelled">Cancelled</span>
     </div>
 
@@ -93,8 +92,7 @@ $page_title = "Your Orders – STORY";
         <select id="orders-filter-status" class="orders-select">
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
-          <option value="shipped">Shipped</option>
-          <option value="delivered">Delivered</option>
+          <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
       </div>
@@ -182,7 +180,7 @@ $page_title = "Your Orders – STORY";
               <button type="button" class="orders-btn orders-btn--primary orders-btn-details" data-order="<?= $oid ?>">
                 View details
               </button>
-              <?php if ($status !== 'cancelled' && $status !== 'delivered'): ?>
+              <?php if ($status !== 'cancelled' && $status !== 'completed'): ?>
                 <button type="button" class="orders-btn orders-btn--secondary" onclick="alert('Tracking info will appear here once shipped.')">
                   Track order
                 </button>

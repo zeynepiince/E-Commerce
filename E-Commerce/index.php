@@ -9,7 +9,6 @@ $bestSellerProducts = get_random_products($pdo, 4);
 $dealProducts       = get_random_products($pdo, 4);
 
 $selectedCategory = $_GET['category'] ?? '';
-$selectedSubCategory = $_GET['sub_category'] ?? '';
 ?>
 
 <?php include 'includes/header.php'; ?>
@@ -44,13 +43,13 @@ $selectedSubCategory = $_GET['sub_category'] ?? '';
     foreach ($categories as $cat => $subCats):
     ?>
       <div class="categories-nav-item">
-        <a href="products.php?category=<?= $cat ?>" class="categories-nav-label <?= $selectedCategory === $cat ? 'active' : '' ?>">
-          <?= ucfirst($cat) ?>
+        <a href="products.php?category=<?= urlencode($cat) ?>" class="categories-nav-label <?= $selectedCategory === $cat ? 'active' : '' ?>">
+          <?= htmlspecialchars(ucfirst($cat), ENT_QUOTES, 'UTF-8') ?>
         </a>
         <div class="categories-nav-sub">
           <?php foreach ($subCats as $sub): ?>
-            <a href="products.php?category=<?= $cat ?>&sub_category=<?= $sub ?>" class="<?= $selectedSubCategory === $sub ? 'active' : '' ?>">
-              <?= str_replace('-', ' ', ucwords($sub)) ?>
+            <a href="products.php?category=<?= urlencode($cat) ?>">
+              <?= htmlspecialchars(str_replace('-', ' ', ucwords($sub)), ENT_QUOTES, 'UTF-8') ?>
             </a>
           <?php endforeach; ?>
         </div>

@@ -32,11 +32,20 @@ if (
             $total += $item["price"] * $item["qty"];
         }
 
+        $paymentMethod = $data['payment_method'] ?? 'Credit Card';
+
         $stmt = $pdo->prepare(
-            "INSERT INTO orders (user_id, total_amount, status)
-             VALUES (?, ?, ?)"
+          "INSERT INTO orders (user_id, total_amount, status, payment_method, payment_status)
+          VALUES (?, ?, ?, ?, ?)"
         );
-        $stmt->execute([$user_id, $total, "pending"]);
+
+        $stmt->execute([
+          $user_id,
+          $total,
+          "pending",
+          $paymentMethod,
+          "Paid"      
+        ]);   
 
         $order_id = $pdo->lastInsertId();
 
@@ -48,7 +57,7 @@ if (
         foreach ($cart as $item) {
             $stmtItem->execute([
                 $order_id,
-                $item["id"],
+                $item["product_id"],
                 $item["qty"],
                 $item["price"]
             ]);
