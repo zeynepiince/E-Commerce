@@ -1,0 +1,171 @@
+/* NAVBAR */
+.elegant-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 70px;
+  background:white;
+  border-bottom:1px solid #e5e7eb;
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+
+.logo{
+  text-decoration:none;
+  color:inherit;
+}
+
+/* LEFT */
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:50px;
+}
+
+.logo{
+  font-size:22px;
+  font-weight:700;
+  color:#ff6f00;
+  letter-spacing:1.6px;
+}
+
+/* CATEGORIES */
+.nav-categories{
+  display:flex;
+  gap:26px;
+}
+
+.nav-categories a{
+  text-decoration:none;
+  font-size:14px;
+  color:#6b7280;
+  font-weight:500;
+}
+
+.nav-categories a:hover{
+  color:#ff6f00;
+}
+
+/* RIGHT */
+.header-right{
+  display:flex;
+  gap:24px;
+  font-size:14px;
+  color:#4b5563;
+  align-items:center;
+}
+
+.nav-action{
+  cursor:pointer;
+}
+
+.nav-action:hover{
+  color:#ff6f00;
+}
+
+.nav-action.highlight{
+  font-weight:600;
+  color:#ff6f00;
+}
+
+.header-right a.nav-action{
+  text-decoration:none;
+  color:inherit;
+}
+
+/* SEARCH */
+.nav-search{
+  width:160px;
+  padding:6px 12px;
+  border:none;
+  border-bottom:1px solid #e5e7eb;
+  background:transparent;
+  font-size:13px;
+  color:#374151;
+  outline:none;
+  transition:.25s;
+}
+
+.nav-search::placeholder{
+  color:#9ca3af;
+}
+
+.nav-search:focus{
+  width:220px;
+  border-color:#ff6f00;
+}
+
+/* Hamburger - hidden on desktop */
+.nav-hamburger{
+  display:none;
+  background:none;
+  border:none;
+  font-size:24px;
+  cursor:pointer;
+  padding:8px;
+  color:#374151;
+}
+
+@media (max-width: 900px){
+  .nav-hamburger{
+    display:block;
+  }
+  .nav-categories{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:#fff;
+    flex-direction:column;
+    padding:20px;
+    gap:12px;
+    border-bottom:1px solid #e5e7eb;
+    display:none;
+  }
+  .nav-categories.nav-categories--open{
+    display:flex;
+  }
+  .elegant-header{
+    padding:14px 24px;
+  }
+  .header-left{
+    gap:20px;
+  }
+  /* Search form container */
+.nav-search-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+/* Input alanı */
+.nav-search-form .nav-search {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db; /* gri sınır */
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 180px; /* genişliği ayarlayabilirsin */
+}
+
+.nav-search-form .nav-search:focus {
+  border-color: #6366f1; /* odaklanınca mor */
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Responsive küçük ekranlarda */
+@media (max-width: 640px) {
+  .nav-search-form {
+    width: 100%;
+  }
+  .nav-search-form .nav-search {
+    flex: 1;
+    width: auto;
+  }
+}
+
+}
+
