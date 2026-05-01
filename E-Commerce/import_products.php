@@ -9,13 +9,18 @@
  *   /E-Commerce/import_products.php?source=dummy  -> DummyJSON API, default limit 20
  *
  * IMPORTANT:
- * This script assumes your `products` table has (at least) columns:
- *   external_id (INT, UNIQUE)
- *   name (VARCHAR)
- *   description (TEXT, NULLable)
- *   price (DECIMAL)
- *   category (VARCHAR)
- *   image_url (TEXT or VARCHAR)
+ * This script assumes your `products` table has:
+ *   external_id
+ *   category_id
+ *   name
+ *   description
+ *   price
+ *   image_url
+ *   stock_quantity
+ *
+ * and a `categories` table with:
+ *   category_id
+ *   category_name
  */
 
 require_once 'functions.php';
@@ -98,19 +103,30 @@ if (!count($products)) {
 }
 
 // IMPORTANT: requires products.external_id to be UNIQUE
-// This version only uses columns that exist in your current schema:
-// external_id, name, category, price, image_url
-$sql = "
-  INSERT INTO products (external_id, name, price, category, image_url)
-  VALUES (:external_id, :name, :price, :category, :image_url)
+// This version uses the normalized schema:
+// categories.category_name
+// products.category_id
+$productSql = "
+  INSERT INTO products (external_id, category_id, name, description, price, image_url, stock_quantity)
+  VALUES (:external_id, :category_id, :name, :description, :price, :image_url, :stock_quantity)
   ON DUPLICATE KEY UPDATE
-    name      = VALUES(name),
-    price     = VALUES(price),
-    category  = VALUES(category),
-    image_url = VALUES(image_url)
+    category_id     = VALUES(category_id),
+    name            = VALUES(name),
+    description     = VALUES(description),
+    price           = VALUES(price),
+    image_url       = VALUES(image_url),
+    stock_quantity  = VALUES(stock_quantity)
 ";
 
-$stmt = $pdo->prepare($sql);
+$productStmt = $pdo->prepare($productSql);
+
+$categorySql = "
+  INSERT INTO categories (category_name)
+  VALUES (:category_name)
+  ON DUPLICATE KEY UPDATE category_name = VALUES(category_name)
+";
+
+$categoryStmt = $pdo->prepare($categorySql);
 
 $inserted = 0;
 $updated  = 0;
@@ -119,16 +135,35 @@ foreach ($products as $p) {
     if (empty($p['external_id'])) {
         continue;
     }
-    $stmt->execute([
-        ':external_id' => $p['external_id'],
-        ':name'        => $p['name'],
-        ':price'       => $p['price'],
-        ':category'    => $p['category'],
-        ':image_url'   => $p['image_url'],
+
+    $categoryName = $p['category'] ?? 'general';
+
+    // 1) kategori varsa ekle, varsa geç
+    $categoryStmt->execute([
+        ':category_name' => $categoryName
     ]);
 
-    // crude way to guess insert vs update: check affected rows
-    $affected = $stmt->rowCount();
+    // 2) category_id al
+    $catIdStmt = $pdo->prepare("
+        SELECT category_id 
+        FROM categories 
+        WHERE category_name = ?
+    ");
+    $catIdStmt->execute([$categoryName]);
+    $categoryId = $catIdStmt->fetchColumn();
+
+    // 3) ürünü category_id ile ekle
+    $productStmt->execute([
+        ':external_id' => $p['external_id'],
+        ':category_id' => $categoryId,
+        ':name' => $p['name'],
+        ':description' => $p['description'],
+        ':price' => $p['price'],
+        ':image_url' => $p['image_url'],
+        ':stock_quantity' => rand(10, 100)
+    ]);
+
+    $affected = $productStmt->rowCount();
     if ($affected === 1) {
         $inserted++;
     } elseif ($affected === 2) {

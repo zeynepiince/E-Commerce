@@ -6,15 +6,31 @@ $productName = isset($_GET['name']) ? trim($_GET['name']) : null;
 $product   = null;
 
 if ($productName) {
-    $stmt = $pdo->prepare("SELECT name, price, image_url FROM products WHERE name = ?");
+    $stmt = $pdo->prepare("
+    SELECT 
+        p.product_id,
+        p.name,
+        p.price,
+        p.image_url,
+        p.description,
+        p.stock_quantity,
+        c.category_name AS category
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.category_id
+    WHERE p.name = ?
+    ");
     $stmt->execute([$productName]);
     $dbProduct = $stmt->fetch();
 
     if ($dbProduct) {
         $product = [
+            'product_id' => $dbProduct['product_id'],
             'name' => $dbProduct['name'],
             'price' => $dbProduct['price'],
             'image_url' => $dbProduct['image_url'],
+            'description' => $dbProduct['description'],
+            'stock_quantity' => $dbProduct['stock_quantity'],
+            'category' => $dbProduct['category'],
             'likes' => rand(10, 100) // placeholder beğeni sayısı
         ];
     }
@@ -27,24 +43,29 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
 
 <section class="products">
   <?php if ($product): ?>
-    <?php $cartId = crc32($product['name']); ?>
+    <?php
+      $cartId = (int) $product['product_id'];
+      $productImage = !empty($product['image_url'])
+      ? $product['image_url']
+      : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff';
+    ?>
     <div class="product-detail">
       <div class="product-detail-image" style="position:relative;">
         <button
           type="button"
           class="wishlist-btn"
-          data-id="<?= (int) $cartId ?>"
+          data-id="<?= $cartId ?>"
           onclick="toggleFavorite(
-            <?= (int) $cartId ?>,
-            '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
-            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>'
+            <?= $cartId ?>,
+            <?= json_encode($product['name']) ?>,
+            <?= json_encode($productImage) ?>
           )"
         >
           ♡
         </button>
         <img 
-          src="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>" 
-          alt="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>" 
+          src="<?= htmlspecialchars($productImage, ENT_QUOTES, 'UTF-8') ?>" 
+          alt="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>"  
           style="max-width:400px; max-height:400px; object-fit:contain; display:block; margin:auto;"
         >
       </div>
@@ -57,7 +78,7 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
           <?= $product['likes'] ?> people liked this
         </p>
         <p class="product-detail-description">
-          <?= htmlspecialchars('Carefully selected for your daily style and comfort.', ENT_QUOTES, 'UTF-8') ?>
+          <?= htmlspecialchars($product['description'] ?: 'Carefully selected for your daily style and comfort.', ENT_QUOTES, 'UTF-8') ?>
         </p>
         <div class="product-detail-meta">
           <div class="product-detail-meta-row">
@@ -70,17 +91,19 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
           </div>
           <div class="product-detail-meta-row">
             <span class="meta-label">Stock</span>
-            <span class="meta-value">In stock</span>
+            <span class="meta-value">
+              <?= ((int)($product['stock_quantity'] ?? 0) > 0) ? 'In stock' : 'Out of stock' ?>
+            </span>
           </div>
         </div>
         <button
           class="btn-full-width"
           style="max-width:260px;"
           onclick="addToCart(
-            <?= (int) $cartId ?>,
-            '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
+            <?= $cartId ?>,
+            <?= json_encode($product['name']) ?>,
             <?= (float) $product['price'] ?>,
-            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>'
+            <?= json_encode($productImage) ?>
           )"
         >
           Add to Cart
@@ -100,9 +123,9 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
     window.addEventListener("DOMContentLoaded", function () {
       if (typeof addRecentlyViewed === "function") {
         addRecentlyViewed({
-          id: <?= (int) $cartId ?>,
-          name: "<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>",
-          imageUrl: "<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>",
+          id: <?= $cartId ?>,
+          name: <?= json_encode($product['name']) ?>,
+          imageUrl: <?= json_encode($productImage) ?>,
           price: <?= (float) $product['price'] ?>
         });
       }

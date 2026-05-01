@@ -46,7 +46,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = parseInt(btn.dataset.id, 10);
     const name = btn.dataset.name || "Product";
     const image = btn.dataset.image || "";
-    if (id) toggleFavorite(id, name, image);
+    const price = parseFloat(btn.dataset.price) || 0;
+    if (id) toggleFavorite(id, name, image, price);
   });
 });
 
@@ -166,7 +167,7 @@ function applyWishlistState() {
   });
 }
 
-function toggleFavorite(id, name, imageUrl) {
+function toggleFavorite(id, name, imageUrl, price = 0) {
   if (isFavorite(id)) {
     favorites = favorites.filter(f => f.id !== id);
   } else {
@@ -270,7 +271,7 @@ function renderWishlistPreview() {
         type="button"
         class="wishlist-btn ${isFavorite(f.id) ? "wishlist-btn--active" : ""}"
         data-id="${f.id}"
-        onclick="toggleFavorite(${f.id}, '${(f.name || "").replace(/'/g, "\\'")}', '${safeImage}')"
+        onclick="toggleFavorite(${f.id}, '${(f.name || "").replace(/'/g, "\\'")}', '${safeImage}', ${f.price || 0})"
       >
         ${isFavorite(f.id) ? "♥" : "♡"}
       </button>
@@ -481,7 +482,7 @@ function sendMessage() {
     page: window.location.pathname
   };
 
-  fetch("/chatbotv2/E-Commerce/chatbot.php", {
+  fetch("chatbot.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -697,7 +698,7 @@ function checkout() {
     btn.textContent = "Processing...";
   }
 
-  fetch("/chatbotv2/E-Commerce/checkout.php", {
+  fetch("checkout.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cart })

@@ -2,62 +2,83 @@
 session_start();
 require_once "db.php";
 
-$data    = json_decode(file_get_contents("php://input"), true);
+header('Content-Type: application/json');
+
+$data = json_decode(file_get_contents("php://input"), true);
+
 $message = strtolower(trim($data["message"] ?? ""));
 $cart    = $data["cart"] ?? [];
-$page    = $data["page"] ?? "";
+
+$user_id = $_SESSION['user_id'] ?? 1;
 
 $reply = "I'm not sure I understood that. Can you rephrase?";
+$intent = null;
+$recommended_product_id = null;
 
-// Basit rule-based intent detection
+// intents
 if (str_contains($message, "hello") || str_contains($message, "hi")) {
+    $intent = "greeting";
     $reply = "Hello! 👋 How can I help you today?";
 }
 elseif (str_contains($message, "price")) {
+    $intent = "price";
     $reply = "You can find product prices on the product cards.";
 }
-elseif (str_contains($message, "order") || str_contains($message, "package") || str_contains($message, "shipment")) {
-    // Örnek: sabit order durumu (login sonrası dinamik yapılacak)
-    $order_status = "Your last order (#123) is being prepared and will be shipped tomorrow.";
-    $reply = $order_status;
+elseif (str_contains($message, "order")) {
+    $intent = "order_status";
+    $reply = "Your last order is being prepared.";
 }
-elseif (str_contains($message, "help")) {
-    $reply = "Sure! I can help you with products, orders, or general questions.";
-}
-// Sepetle ilgili soru
-elseif (str_contains($message, "cart") || str_contains($message, "basket")) {
+elseif (str_contains($message, "cart")) {
+    $intent = "cart_info";
+
     if (!empty($cart)) {
-        $count = 0;
-        $names = [];
-        foreach ($cart as $item) {
-            $count += $item["qty"] ?? 1;
-            $names[] = $item["name"] ?? "item";
-        }
-        $uniqueNames = implode(", ", array_unique($names));
-        $reply = "You currently have {$count} item(s) in your cart: {$uniqueNames}.";
+        $count = array_sum(array_column($cart, "qty"));
+        $reply = "You have {$count} items in your cart.";
     } else {
-        $reply = "Your cart looks empty right now. You can add products from the product cards.";
+        $reply = "Your cart is empty.";
     }
 }
-// Basit ürün önerisi
-elseif (str_contains($message, "recommend") || str_contains($message, "suggest")) {
-    $reply = "Looking for recommendations? On the home page we highlight featured products, and on the Products page you can filter by category and price.";
+elseif (str_contains($message, "recommend")) {
+    $intent = "recommendation";
+
+    $stmt = $pdo->query("SELECT product_id, name FROM products ORDER BY RAND() LIMIT 1");
+    $p = $stmt->fetch();
+
+    if ($p) {
+        $recommended_product_id = $p['product_id'];
+        $reply = "I recommend: " . $p['name'];
+    }
 }
 
-// LOG TO DB
-$user_id = 1; // şimdilik sabit
-$stmt = $pdo->prepare("
-  INSERT INTO support_interactions (user_id, message, sender)
-  VALUES (?, ?, 'user')
-");
-$stmt->execute([$user_id, $message]);
+try {
+    $stmt = $pdo->prepare("
+        INSERT INTO support_interactions 
+        (user_id, message, sender, intent, recommended_product_id)
+        VALUES (?, ?, ?, ?, ?)
+    ");
 
-$stmt = $pdo->prepare("
-  INSERT INTO support_interactions (user_id, message, sender)
-  VALUES (?, ?, 'system')
-");
-$stmt->execute([$user_id, $reply]);
+    // user message
+    $stmt->execute([
+        $user_id,
+        $message,
+        'user',
+        $intent,
+        null
+    ]);
 
-echo json_encode([
-  "reply" => $reply
-]);
+    // bot message
+    $stmt->execute([
+        $user_id,
+        $reply,
+        'bot',
+        $intent,
+        $recommended_product_id
+    ]);
+
+    echo json_encode(["reply" => $reply]);
+
+} catch (Exception $e) {
+    echo json_encode([
+        "reply" => "ERROR: " . $e->getMessage()
+    ]);
+}
