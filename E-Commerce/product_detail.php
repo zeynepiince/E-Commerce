@@ -34,10 +34,14 @@ $page_title = $product ? ($product['name'] . " – STORY") : "Product Detail –
           type="button"
           class="wishlist-btn"
           data-id="<?= (int) $cartId ?>"
+          data-name="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>"
+          data-image="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>"
+          data-price="<?= htmlspecialchars((string) ((float) $product['price']), ENT_QUOTES, 'UTF-8') ?>"
           onclick="toggleFavorite(
             <?= (int) $cartId ?>,
             '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
-            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>'
+            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>',
+            <?= (float) $product['price'] ?>
           )"
         >
           ♡

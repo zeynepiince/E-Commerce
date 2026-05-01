@@ -69,9 +69,10 @@ function get_featured_products(PDO $pdo): array
 {
     try {
         $stmt = $pdo->query(
-            "SELECT `name`, `price`, `image_url`, `category`
-             FROM products
-             WHERE is_featured = 1
+            "SELECT p.`name`, p.`price`, p.`image_url`, COALESCE(c.category_name, '') AS `category`, p.`badges`
+             FROM products p
+             LEFT JOIN categories c ON c.category_id = p.category_id
+             WHERE p.is_featured = 1
              LIMIT 8"
         );
         $rows = $stmt->fetchAll();
@@ -86,8 +87,9 @@ function get_featured_products(PDO $pdo): array
 function get_random_products(PDO $pdo, int $limit = 4): array
 {
     $stmt = $pdo->prepare(
-        "SELECT `name`, `price`, `image_url`, `category`
-         FROM products
+        "SELECT p.`name`, p.`price`, p.`image_url`, COALESCE(c.category_name, '') AS `category`, p.`badges`
+         FROM products p
+         LEFT JOIN categories c ON c.category_id = p.category_id
          ORDER BY RAND()
          LIMIT ?"
     );

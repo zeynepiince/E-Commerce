@@ -199,9 +199,9 @@ function toggleFooterInfo(e, id) {
   </button>
 </div>
 
-<script src="assets/js/main.js"></script>
+<script src="assets/js/main.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/main.js')) ?>"></script>
 <?php if (isset($is_homepage) && $is_homepage): ?>
-<script src="assets/js/homepage.js"></script>
+<script src="assets/js/homepage.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/homepage.js')) ?>"></script>
 <?php endif; ?>
 </body>
 </html>

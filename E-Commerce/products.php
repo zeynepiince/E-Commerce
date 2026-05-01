@@ -2,7 +2,6 @@
 require_once 'functions.php';
 
 $selectedCategory = $_GET['category'] ?? '';
-$selectedSubCategory = $_GET['sub_category'] ?? '';
 $minPrice = $_GET['min_price'] ?? '';
 $maxPrice = $_GET['max_price'] ?? '';
 $sort = $_GET['sort'] ?? 'popular';
@@ -11,50 +10,74 @@ $searchQuery = $_GET['q'] ?? '';
 // Categories
 $categories = [];
 try {
-    $catStmt = $pdo->query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category");
+    $catStmt = $pdo->query("
+        SELECT category_name 
+        FROM categories 
+        ORDER BY category_name
+    ");
     $categories = $catStmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {
     $categories = [];
 }
 
 // Base query
-$sql = "SELECT name, price, image_url, category, sub_category FROM products WHERE 1=1";
+$sql = "
+    SELECT 
+        p.product_id,
+        p.external_id,
+        p.name,
+        p.price,
+        p.image_url,
+        p.is_featured,
+        p.badges,
+        p.description,
+        p.stock_quantity,
+        c.category_name AS category
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.category_id
+    WHERE 1=1
+";
 $params = [];
 
 if ($selectedCategory !== '') {
-    $sql .= " AND category = ?";
+    $sql .= " AND LOWER(c.category_name) = LOWER(?)";
     $params[] = $selectedCategory;
 }
 
-if ($selectedSubCategory !== '') {
-    $sql .= " AND sub_category = ?";
-    $params[] = $selectedSubCategory;
-}
-
 if ($minPrice !== '' && is_numeric($minPrice)) {
-    $sql .= " AND price >= ?";
+    $sql .= " AND p.price >= ?";
     $params[] = (float) $minPrice;
 }
 if ($maxPrice !== '' && is_numeric($maxPrice)) {
-    $sql .= " AND price <= ?";
+    $sql .= " AND p.price <= ?";
     $params[] = (float) $maxPrice;
 }
+
 if ($searchQuery !== '') {
-    $sql .= " AND (name LIKE ? OR category LIKE ? OR sub_category LIKE ?)";
-    $params[] = "%$searchQuery%";
-    $params[] = "%$searchQuery%";
-    $params[] = "%$searchQuery%";
+    $tokens = preg_split('/\s+/u', trim($searchQuery)) ?: [];
+    $tokens = array_values(array_filter(array_map('trim', $tokens), fn($t) => $t !== ''));
+    if (!empty($tokens)) {
+        $orParts = [];
+        foreach (array_slice($tokens, 0, 6) as $t) {
+            $orParts[] = "p.name LIKE ?";
+            $orParts[] = "c.category_name LIKE ?";
+            $like = "%" . $t . "%";
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $sql .= " AND (" . implode(" OR ", $orParts) . ")";
+    }
 }
 
 switch ($sort) {
     case 'price-asc':
-        $sql .= " ORDER BY price ASC";
+        $sql .= " ORDER BY p.price ASC";
         break;
     case 'price-desc':
-        $sql .= " ORDER BY price DESC";
+        $sql .= " ORDER BY p.price DESC";
         break;
     case 'name':
-        $sql .= " ORDER BY name ASC";
+        $sql .= " ORDER BY p.name ASC";
         break;
     default:
         $sql .= " ORDER BY RAND()";
@@ -79,12 +102,10 @@ $page_title = "Products – STORY";
 <div class="products-page">
   <header class="products-header">
     <h1 class="products-title">
-      <?= $selectedSubCategory ? htmlspecialchars($selectedSubCategory, ENT_QUOTES, 'UTF-8') : ($selectedCategory ? htmlspecialchars($selectedCategory, ENT_QUOTES, 'UTF-8') : 'Our Products') ?>
+      <?= $selectedCategory ? htmlspecialchars($selectedCategory, ENT_QUOTES, 'UTF-8') : 'Our Products' ?>
     </h1>
     <p class="products-subtitle">
-      <?php if ($selectedSubCategory): ?>
-        Browse <strong><?= htmlspecialchars($selectedSubCategory, ENT_QUOTES, 'UTF-8') ?></strong> in <strong><?= htmlspecialchars($selectedCategory, ENT_QUOTES, 'UTF-8') ?></strong>.
-      <?php elseif ($selectedCategory): ?>
+      <?php if ($selectedCategory): ?>
         Browse <strong><?= htmlspecialchars($selectedCategory, ENT_QUOTES, 'UTF-8') ?></strong> from our collection.
       <?php else: ?>
         Discover our <strong>curated</strong> collection of fashion, tech, and lifestyle essentials.
@@ -105,11 +126,6 @@ $page_title = "Products – STORY";
             </option>
           <?php endforeach; ?>
         </select>
-      </div>
-
-      <div class="products-filter-group">
-        <label for="sub_category">Sub-category</label>
-        <input type="text" name="sub_category" id="sub_category" class="products-input" placeholder="e.g. Speakers" value="<?= htmlspecialchars($selectedSubCategory, ENT_QUOTES, 'UTF-8') ?>">
       </div>
 
       <div class="products-filter-group">

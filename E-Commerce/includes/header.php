@@ -13,15 +13,15 @@ $loggedInName = $_SESSION['user_name'] ?? null;
   <title><?= htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8') ?></title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="assets/css/navbar.css">
-  <link rel="stylesheet" href="assets/css/auth-modal.css">
+  <link rel="stylesheet" href="assets/css/style.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/style.css')) ?>">
+  <link rel="stylesheet" href="assets/css/navbar.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/navbar.css')) ?>">
+  <link rel="stylesheet" href="assets/css/auth-modal.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/auth-modal.css')) ?>">
   <?php if (isset($is_homepage) && $is_homepage): ?>
-  <link rel="stylesheet" href="assets/css/homepage.css">
-  <link rel="stylesheet" href="assets/css/products.css">
+  <link rel="stylesheet" href="assets/css/homepage.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/homepage.css')) ?>">
+  <link rel="stylesheet" href="assets/css/products.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/products.css')) ?>">
   <?php endif; ?>
   <?php if (isset($is_checkout) && $is_checkout): ?>
-  <link rel="stylesheet" href="assets/css/checkout.css">
+  <link rel="stylesheet" href="assets/css/checkout.css?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/checkout.css')) ?>">
   <?php endif; ?>
 </head>
 <body>

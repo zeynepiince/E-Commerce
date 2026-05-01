@@ -2,6 +2,87 @@ let cart = [];
 let total = 0;
 let favorites = [];
 let recentlyViewed = [];
+let lastChatIntent = "";
+const CHAT_QUICK_PROMPTS_BY_PAGE = {
+  default: [
+    "Suggest running shoes under 100",
+    "How long does shipping take?",
+    "What is your return policy?",
+    "What's in my cart?"
+  ],
+  home: [
+    "What are today's featured products?",
+    "Suggest popular items under 100",
+    "How long does shipping take?",
+    "What is your return policy?"
+  ],
+  products: [
+    "Suggest electronics under 150",
+    "Show the cheapest products",
+    "What are the newest products?",
+    "Do you have Nike products?"
+  ],
+  checkout: [
+    "How long does shipping take?",
+    "Is payment secure?",
+    "What is your return policy?",
+    "What's in my cart?"
+  ],
+  wishlist: [
+    "Suggest items similar to my wishlist",
+    "Show the lowest-priced options",
+    "Are any of these out of stock?",
+    "Open these in the products page"
+  ]
+};
+const CHAT_QUICK_PROMPTS_CART_EMPTY = [
+  "Suggest products under 100",
+  "Show most popular items",
+  "How long does shipping take?",
+  "What is your return policy?"
+];
+const CHAT_QUICK_PROMPTS_CART_FULL = [
+  "What's in my cart?",
+  "Suggest best options before checkout",
+  "Is payment secure?",
+  "How is shipping cost calculated?"
+];
+const CHAT_QUICK_PROMPTS_BY_INTENT = {
+  product_search: [
+    "Show cheaper options",
+    "Show only black ones",
+    "Open these in products page",
+    "Show in-stock items"
+  ],
+  shipping: [
+    "What is the free shipping threshold?",
+    "When will my order arrive?",
+    "Which shipping carrier do you use?",
+    "Do you offer fast delivery?"
+  ],
+  returns: [
+    "How many days do I have for returns?",
+    "Is return shipping free?",
+    "Can I exchange items?",
+    "Summarize your return policy"
+  ],
+  payment: [
+    "What payment methods do you support?",
+    "Do you offer installments?",
+    "Do you support cash on delivery?",
+    "What happens if payment fails?"
+  ],
+  order_status: [
+    "Check my order status again",
+    "Has it been shipped?",
+    "What is the estimated delivery date?",
+    "Can I cancel my order?"
+  ]
+};
+
+function appUrl(path) {
+  return new URL(path, window.location.href).toString();
+}
 
 // Initialize cart from localStorage on load
 function toggleNavMenu() {
@@ -21,6 +102,8 @@ document.addEventListener("DOMContentLoaded", () => {
   renderCart();
   loadFavorites();
   loadRecentlyViewed();
+  hydrateFavoritePrices();
+  hydrateFavoritePricesFromServer();
 
   const checkoutSummary = document.getElementById("checkoutCartSummary");
   if (checkoutSummary) {
@@ -37,6 +120,17 @@ document.addEventListener("DOMContentLoaded", () => {
   renderWishlistPreview();
   renderWishlist();
   renderRecentlyViewed();
+  renderChatQuickPrompts();
+
+  const chatInput = document.getElementById("userInput");
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  }
 
   // Event delegation for product card wishlist buttons (data-name = product card)
   document.addEventListener("click", (e) => {
@@ -46,9 +140,77 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = parseInt(btn.dataset.id, 10);
     const name = btn.dataset.name || "Product";
     const image = btn.dataset.image || "";
-    if (id) toggleFavorite(id, name, image);
+    const parsed = parseFloat(btn.dataset.price || "");
+    const price = Number.isFinite(parsed) ? parsed : null;
+    if (id) toggleFavorite(id, name, image, price);
   });
+
 });
+
+function renderChatQuickPrompts(force = false) {
+  const chatBody = document.getElementById("chatBody");
+  if (!chatBody) return;
+  const existing = document.getElementById("chatQuickPrompts");
+  if (existing && !force) return;
+  if (existing && force) existing.remove();
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg bot";
+  wrap.id = "chatQuickPrompts";
+  wrap.style.marginTop = "8px";
+
+  const title = document.createElement("div");
+  title.textContent = "Try one of these:";
+  title.style.fontSize = "12px";
+  title.style.color = "#6b7280";
+  title.style.marginBottom = "8px";
+  wrap.appendChild(title);
+
+  const buttons = document.createElement("div");
+  buttons.style.display = "flex";
+  buttons.style.flexWrap = "wrap";
+  buttons.style.gap = "6px";
+
+  const pagePrompts = getChatQuickPromptsForPage();
+  pagePrompts.forEach((text) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = text;
+    btn.style.fontSize = "12px";
+    btn.style.padding = "6px 10px";
+    btn.style.border = "1px solid #e5e7eb";
+    btn.style.background = "#fff";
+    btn.style.borderRadius = "999px";
+    btn.style.cursor = "pointer";
+    btn.onclick = () => sendQuickPrompt(text);
+    buttons.appendChild(btn);
+  });
+
+  wrap.appendChild(buttons);
+  chatBody.appendChild(wrap);
+}
+
+function getChatQuickPromptsForPage() {
+  if (lastChatIntent && CHAT_QUICK_PROMPTS_BY_INTENT[lastChatIntent]) {
+    return CHAT_QUICK_PROMPTS_BY_INTENT[lastChatIntent];
+  }
+
+  const cartCount = Array.isArray(cart) ? cart.reduce((sum, item) => sum + (item.qty || 0), 0) : 0;
+  if (cartCount > 0) return CHAT_QUICK_PROMPTS_CART_FULL;
+
+  const path = (window.location.pathname || "").toLowerCase();
+  if (path.includes("index.php") || path.endsWith("/e-commerce/") || path.endsWith("/e-commerce")) {
+    return CHAT_QUICK_PROMPTS_BY_PAGE.home;
+  }
+  if (path.includes("products.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.products;
+  if (path.includes("checkout.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.checkout;
+  if (path.includes("wishlist.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.wishlist;
+  return CHAT_QUICK_PROMPTS_BY_PAGE.default.length ? CHAT_QUICK_PROMPTS_BY_PAGE.default : CHAT_QUICK_PROMPTS_CART_EMPTY;
+}
+
+function sendQuickPrompt(text) {
+  sendChatMessage(text);
+}
 
 function loadFavorites() {
   try {
@@ -60,7 +222,7 @@ function loadFavorites() {
         id: f.id,
         name: f.name,
         imageUrl: f.imageUrl || null,
-        price: typeof f.price === "number" ? f.price : null,
+        price: Number.isFinite(Number(f.price)) ? Number(f.price) : null,
         seller: f.seller || "STORY Partner",
         shipping: f.shipping || "Free shipping",
         qty: typeof f.qty === "number" ? f.qty : 1,
@@ -166,15 +328,107 @@ function applyWishlistState() {
   });
 }
 
-function toggleFavorite(id, name, imageUrl) {
+function getFavoritePriceFromDom(id) {
+  const buttons = document.querySelectorAll(`.wishlist-btn[data-id="${id}"]`);
+  if (!buttons.length) return null;
+
+  for (const btn of buttons) {
+    const dataPrice = parseFloat(btn.dataset.price || "");
+    if (Number.isFinite(dataPrice) && dataPrice > 0) return dataPrice;
+
+    const card = btn.closest(".product-card, .card, .wishlist-card, .cart-item, .checkout-summary-item");
+    if (!card) continue;
+    const priceEl = card.querySelector(".product-card-price, .price, .wishlist-card-price, .cart-line-price, .checkout-summary-item-line");
+    if (!priceEl) continue;
+    const numeric = parseFloat((priceEl.textContent || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+
+  return null;
+}
+
+function getFavoritePriceFromKnownSources(id, name) {
+  const domPrice = getFavoritePriceFromDom(id);
+  if (typeof domPrice === "number" && domPrice > 0) return domPrice;
+
+  const cartItem = cart.find((c) => c.id === id && typeof c.price === "number" && c.price > 0);
+  if (cartItem) return cartItem.price;
+
+  const viewed = recentlyViewed.find((p) => p.id === id && typeof p.price === "number" && p.price > 0);
+  if (viewed) return viewed.price;
+
+  if (name) {
+    const byName = recentlyViewed.find((p) => p.name === name && typeof p.price === "number" && p.price > 0);
+    if (byName) return byName.price;
+  }
+
+  return null;
+}
+
+function hydrateFavoritePrices() {
+  let changed = false;
+  favorites = favorites.map((f) => {
+    if (typeof f.price === "number" && f.price > 0) return f;
+    const fixedPrice = getFavoritePriceFromKnownSources(f.id, f.name);
+    if (typeof fixedPrice === "number" && fixedPrice > 0) {
+      changed = true;
+      return { ...f, price: fixedPrice };
+    }
+    return f;
+  });
+  if (changed) {
+    saveFavorites();
+    renderWishlist();
+    renderWishlistPreview();
+  }
+}
+
+function hydrateFavoritePricesFromServer() {
+  const missing = favorites
+    .filter((f) => !(typeof f.price === "number" && f.price > 0) && f.name)
+    .map((f) => f.name);
+
+  if (!missing.length) return;
+
+  fetch(appUrl("wishlist_prices.php"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names: missing })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data || !data.success || !data.prices) return;
+      let changed = false;
+      favorites = favorites.map((f) => {
+        if (typeof f.price === "number" && f.price > 0) return f;
+        const p = Number(data.prices[f.name]);
+        if (Number.isFinite(p) && p > 0) {
+          changed = true;
+          return { ...f, price: p };
+        }
+        return f;
+      });
+      if (changed) {
+        saveFavorites();
+        renderWishlist();
+        renderWishlistPreview();
+      }
+    })
+    .catch(() => {});
+}
+
+function toggleFavorite(id, name, imageUrl, price = null) {
   if (isFavorite(id)) {
     favorites = favorites.filter(f => f.id !== id);
   } else {
+    const finalPrice = typeof price === "number" && !Number.isNaN(price) && price > 0
+      ? price
+      : getFavoritePriceFromKnownSources(id, name);
     favorites.push({
       id,
       name,
       imageUrl: imageUrl || null,
-      price: typeof price === "number" ? price : 0,
+      price: typeof finalPrice === "number" ? finalPrice : 0,
       seller: "STORY Partner",
       shipping: "Free shipping",
       qty: 1,
@@ -455,6 +709,9 @@ function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving) {
 function toggleChat() {
   const chat = document.getElementById("chatbot");
   if (!chat) return;
+  chat.style.zIndex = "2147483647";
+  const chatToggle = document.querySelector(".chat-toggle");
+  if (chatToggle) chatToggle.style.zIndex = "2147483646";
   chat.classList.toggle("active");
 }
 
@@ -464,24 +721,28 @@ function sendMessage() {
 
   const message = input.value.trim();
   if (message === "") return;
+  input.value = "";
+  sendChatMessage(message);
+}
 
+function sendChatMessage(message) {
   const chatBody = document.getElementById("chatBody");
   if (!chatBody) return;
+  const finalMessage = String(message || "").trim();
+  if (!finalMessage) return;
 
   const userMsg = document.createElement("div");
   userMsg.className = "msg user";
-  userMsg.innerText = message;
+  userMsg.innerText = finalMessage;
   chatBody.appendChild(userMsg);
 
-  input.value = "";
-
   const payload = {
-    message,
+    message: finalMessage,
     cart,
     page: window.location.pathname
   };
 
-  fetch("/chatbotv2/E-Commerce/chatbot.php", {
+  fetch(appUrl("chatbot.php"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -492,6 +753,41 @@ function sendMessage() {
       botMsg.className = "msg bot";
       botMsg.innerText = data.reply ?? "Sorry, I didn’t understand.";
       chatBody.appendChild(botMsg);
+      lastChatIntent = typeof data.intent === "string" ? data.intent : "";
+
+      const suggested = Array.isArray(data.suggested_products) ? data.suggested_products : [];
+      if (suggested.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "msg bot";
+        wrap.style.marginTop = "8px";
+        wrap.innerHTML = suggested.map((p) => {
+          const id = Number(p.product_id || 0);
+          const name = String(p.name || "Product").replace(/'/g, "\\'");
+          const image = String(p.image_url || "https://images.unsplash.com/photo-1542291026-7eec264c27ff").replace(/'/g, "\\'");
+          const price = Number(p.price || 0);
+          return `
+            <div style="display:flex;gap:8px;align-items:center;border:1px solid #e5e7eb;background:#fff;padding:8px;border-radius:10px;margin-bottom:8px;">
+              <img src="${image}" alt="${name}" style="width:46px;height:46px;object-fit:cover;border-radius:8px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+                <div style="font-size:12px;color:#6b7280;">$${price.toFixed(2)}</div>
+              </div>
+              <a href="product_detail.php?name=${encodeURIComponent(name)}" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid #e5e7eb;color:#374151;text-decoration:none;">View</a>
+              <button style="font-size:12px;padding:6px 10px;border:none;border-radius:8px;background:#FF6F00;color:#fff;cursor:pointer;" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">Add</button>
+            </div>
+          `;
+        }).join("");
+        chatBody.appendChild(wrap);
+      }
+      const redirectUrl = typeof data.redirect_url === "string" ? data.redirect_url : "";
+      if (redirectUrl) {
+        const cta = document.createElement("div");
+        cta.className = "msg bot";
+        cta.style.marginTop = "6px";
+        cta.innerHTML = `<a href="${redirectUrl}" style="display:inline-block;padding:8px 12px;border-radius:8px;background:#111827;color:#fff;text-decoration:none;font-size:12px;">Show all matching products</a>`;
+        chatBody.appendChild(cta);
+      }
+      renderChatQuickPrompts(true);
       chatBody.scrollTop = chatBody.scrollHeight;
     })
     .catch(() => {
@@ -682,7 +978,7 @@ function goToCheckout() {
     return;
   }
   saveCart();
-  window.location.href = "/E-Commerce/checkout.php";
+  window.location.href = appUrl("checkout.php");
 }
 
 function checkout() {
@@ -697,7 +993,7 @@ function checkout() {
     btn.textContent = "Processing...";
   }
 
-  fetch("/chatbotv2/E-Commerce/checkout.php", {
+  fetch(appUrl("checkout.php"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cart })

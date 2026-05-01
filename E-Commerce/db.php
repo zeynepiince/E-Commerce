@@ -2,7 +2,7 @@
 $host = "localhost";
 $db   = "chatbotv2_db";
 $user = "root";
-$pass = "";
+$pass = "root";
 
 try {
     $pdo = new PDO(

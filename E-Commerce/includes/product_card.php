@@ -16,7 +16,7 @@ if (isset($badges) && is_array($badges)) {
 }
 ?>
 <div class="product-card">
-  <button type="button" class="product-card-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>">♡</button>
+  <button type="button" class="product-card-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>">♡</button>
   <a href="product_detail.php?name=<?= urlencode($productName) ?>" class="product-card-link">
     <?php if (!empty($badgeList)): ?>
       <div class="product-card-badges">
