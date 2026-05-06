@@ -116,6 +116,36 @@
   background: #fff;
 }
 
+.checkout-phone-group {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 1.25fr;
+  gap: 10px;
+}
+
+.checkout-phone-country,
+.checkout-phone-number {
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.checkout-phone-country:hover,
+.checkout-phone-number:hover {
+  background: #fff;
+  border-color: #d1d5db;
+}
+
+.checkout-phone-country:focus,
+.checkout-phone-number:focus {
+  outline: none;
+  border-color: #FF6F00;
+  box-shadow: 0 0 0 3px rgba(255, 111, 0, 0.15);
+  background: #fff;
+}
+
 /* Payment Methods */
 .payment-methods {
   display: flex;
@@ -461,6 +491,10 @@
   }
 
   .checkout-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-phone-group {
     grid-template-columns: 1fr;
   }
 

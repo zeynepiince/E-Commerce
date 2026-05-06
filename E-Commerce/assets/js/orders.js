@@ -4,18 +4,78 @@
   const filterSelect = document.getElementById('orders-filter-status');
   const sortSelect = document.getElementById('orders-sort');
   const ordersList = document.getElementById('ordersList');
+  const lang = (window.APP_LANG || 'en').toLowerCase();
+  const tr = lang === 'tr';
+  const t = {
+    viewDetails: tr ? 'Detayları gör' : 'View details',
+    hideDetails: tr ? 'Detayları gizle' : 'Hide details',
+    trackOrder: tr ? 'Siparişi takip et' : 'Track order',
+    hideTracking: tr ? 'Takibi gizle' : 'Hide tracking',
+    cancelling: tr ? 'İptal ediliyor...' : 'Cancelling...',
+    cancelOrder: tr ? 'Siparişi iptal et' : 'Cancel order',
+    cancelConfirm: tr ? 'Bu siparişi iptal etmek istiyor musunuz?' : 'Do you want to cancel this order?',
+    cancelFailed: tr ? 'Sipariş iptal edilemedi.' : 'Order could not be cancelled.',
+    cancelled: tr ? 'İptal' : 'Cancelled'
+  };
 
-  // View details toggle
-  document.querySelectorAll('.orders-btn-details').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      const orderId = btn.dataset.order;
-      const detailsEl = document.getElementById('order-details-' + orderId);
-      if (!detailsEl) return;
+  window.orderToggleDetails = function (orderId, btn) {
+    const detailsEl = document.getElementById('order-details-' + orderId);
+    if (!detailsEl) return;
+    const isOpen = detailsEl.classList.toggle('orders-card-details--open');
+    if (btn) btn.textContent = isOpen ? t.hideDetails : t.viewDetails;
+  };
 
-      const isOpen = detailsEl.classList.toggle('orders-card-details--open');
-      btn.textContent = isOpen ? 'Hide details' : 'View details';
-    });
-  });
+  window.orderToggleTracking = function (orderId, btn) {
+    const trackEl = document.getElementById('order-tracking-' + orderId);
+    if (!trackEl) return;
+    const isOpen = trackEl.classList.toggle('orders-card-details--open');
+    if (btn) btn.textContent = isOpen ? t.hideTracking : t.trackOrder;
+  };
+
+  window.orderCancel = function (orderId, btn) {
+    if (!orderId || !btn) return;
+    if (!window.confirm(t.cancelConfirm)) return;
+    btn.disabled = true;
+    const prevText = btn.textContent;
+    btn.textContent = t.cancelling;
+    const body = new URLSearchParams();
+    body.set('order_id', orderId);
+
+    fetch('cancel_order.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data || !data.success) {
+          alert((data && data.error) ? data.error : t.cancelFailed);
+          btn.disabled = false;
+          btn.textContent = prevText || t.cancelOrder;
+          return;
+        }
+        const card = btn.closest('.orders-card');
+        if (card) {
+          card.dataset.status = 'cancelled';
+          card.classList.remove('orders-card--pending', 'orders-card--shipped', 'orders-card--delivered');
+          card.classList.add('orders-card--cancelled');
+          const statusEl = card.querySelector('.orders-card-status');
+          if (statusEl) {
+            statusEl.classList.remove('orders-status--pending', 'orders-status--shipped', 'orders-status--delivered');
+            statusEl.classList.add('orders-status--cancelled');
+            statusEl.textContent = t.cancelled;
+          }
+          const trackBtn = card.querySelector('.orders-btn-track');
+          if (trackBtn) trackBtn.remove();
+        }
+        btn.remove();
+      })
+      .catch(function () {
+        alert(t.cancelFailed);
+        btn.disabled = false;
+        btn.textContent = prevText || t.cancelOrder;
+      });
+  };
 
   function getOrderCards() {
     if (!ordersList) return [];

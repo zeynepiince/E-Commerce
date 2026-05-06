@@ -22,7 +22,7 @@ $orders = [];
 $orderItemsByOrder = [];
 try {
     $stmt = $pdo->prepare("
-      SELECT order_id AS order_id, total_amount, status, created_at
+      SELECT order_id AS id, total_amount, status, created_at
       FROM orders
       WHERE user_id = ?
       ORDER BY created_at DESC
@@ -77,12 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name !== '' && $email !== '') {
             $update = $pdo->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
             $update->execute([$name, $email, $userId]);
-            $profileMessage = 'Profile updated successfully.';
+            $profileMessage = t('profile.msg.updated', 'Profile updated successfully.');
             $user['name'] = $name;
             $user['email'] = $email;
             $_SESSION['user_name'] = $name;
         } else {
-            $profileMessage = 'Name and email are required.';
+            $profileMessage = t('profile.msg.name_email_required', 'Name and email are required.');
         }
     } elseif ($action === 'password') {
         $current = $_POST['current_password'] ?? '';
@@ -90,32 +90,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $confirm = $_POST['confirm_password'] ?? '';
 
         if ($new === '' || $confirm === '') {
-            $passwordMessage = 'New password and confirmation are required.';
+            $passwordMessage = t('profile.msg.password_required', 'New password and confirmation are required.');
         } elseif ($new !== $confirm) {
-            $passwordMessage = 'New passwords do not match.';
+            $passwordMessage = t('profile.msg.password_mismatch', 'New passwords do not match.');
         } elseif (strlen($new) < 8) {
-            $passwordMessage = 'Password must be at least 8 characters.';
+            $passwordMessage = t('profile.msg.password_min', 'Password must be at least 8 characters.');
         } else {
             $validCurrent = !empty($user['password_hash']) && password_verify($current, $user['password_hash']);
 
             if (!$validCurrent) {
-                $passwordMessage = 'Current password is incorrect.';
+                $passwordMessage = t('profile.msg.current_password_wrong', 'Current password is incorrect.');
             } else {
                 $hash = password_hash($new, PASSWORD_DEFAULT);
                 $update = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
                 $update->execute([$hash, $userId]);
-                $passwordMessage = 'Password updated successfully.';
+                $passwordMessage = t('profile.msg.password_updated', 'Password updated successfully.');
                 $user['password_hash'] = $hash;
             }
         }
     } elseif ($action === 'settings') {
-        $settingsMessage = 'Preferences saved.';
+        $settingsMessage = t('profile.msg.preferences_saved', 'Preferences saved.');
     }
 }
 
-$membershipDate = isset($user['created_at']) ? date('F j, Y', strtotime($user['created_at'])) : 'Member';
+$membershipDate = isset($user['created_at']) ? date('F j, Y', strtotime($user['created_at'])) : t('profile.member', 'Member');
 
-$page_title = "Your Profile – STORY";
+$page_title = t("meta.profile_title", "ZERA - Profile");
 ?>
 <?php include 'includes/header.php'; ?>
 
@@ -126,23 +126,23 @@ $page_title = "Your Profile – STORY";
     <nav class="profile-nav">
       <a href="#profile-info" class="profile-nav-item active">
         <span class="profile-nav-icon">👤</span>
-        Profile Info
+        <?= htmlspecialchars(t('profile.nav.info', 'Profile Info'), ENT_QUOTES, 'UTF-8') ?>
       </a>
       <a href="#orders" class="profile-nav-item">
         <span class="profile-nav-icon">📦</span>
-        Orders
+        <?= htmlspecialchars(t('profile.nav.orders', 'Orders'), ENT_QUOTES, 'UTF-8') ?>
       </a>
       <a href="#wishlist" class="profile-nav-item">
         <span class="profile-nav-icon">♥</span>
-        Wishlist
+        <?= htmlspecialchars(t('profile.nav.wishlist', 'Wishlist'), ENT_QUOTES, 'UTF-8') ?>
       </a>
       <a href="#settings" class="profile-nav-item">
         <span class="profile-nav-icon">⚙</span>
-        Settings
+        <?= htmlspecialchars(t('profile.nav.settings', 'Settings'), ENT_QUOTES, 'UTF-8') ?>
       </a>
     </nav>
     <div class="profile-sidebar-footer">
-      <a href="logout.php" class="profile-logout">Log out</a>
+      <a href="logout.php" class="profile-logout"><?= htmlspecialchars(t('profile.logout', 'Log out'), ENT_QUOTES, 'UTF-8') ?></a>
     </div>
   </aside>
 
@@ -154,12 +154,12 @@ $page_title = "Your Profile – STORY";
       <div class="profile-hero-info">
         <h1 class="profile-hero-name"><?= htmlspecialchars($user['full_name'], ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="profile-hero-email"><?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?></p>
-        <p class="profile-hero-date">Member since <?= htmlspecialchars($membershipDate, ENT_QUOTES, 'UTF-8') ?></p>
+        <p class="profile-hero-date"><?= htmlspecialchars(t('profile.member_since', 'Member since'), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars($membershipDate, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
     </div>
 
     <section id="profile-info" class="profile-section">
-      <h2 class="profile-section-title">Profile Info</h2>
+      <h2 class="profile-section-title"><?= htmlspecialchars(t('profile.section.info', 'Profile Info'), ENT_QUOTES, 'UTF-8') ?></h2>
       <div class="profile-card">
         <?php if ($profileMessage): ?>
           <div class="profile-message profile-message--success"><?= htmlspecialchars($profileMessage, ENT_QUOTES, 'UTF-8') ?></div>
@@ -167,43 +167,43 @@ $page_title = "Your Profile – STORY";
         <form method="post" class="profile-form">
           <input type="hidden" name="action" value="profile">
           <div class="profile-field">
-            <label for="profile-name">Full Name</label>
+            <label for="profile-name"><?= htmlspecialchars(t('profile.full_name', 'Full Name'), ENT_QUOTES, 'UTF-8') ?></label>
             <input type="text" id="profile-name" name="full_name" value="<?= htmlspecialchars($user['full_name'], ENT_QUOTES, 'UTF-8') ?>" required>
           </div>
           <div class="profile-field">
-            <label for="profile-email">Email</label>
+            <label for="profile-email"><?= htmlspecialchars(t('profile.email', 'Email'), ENT_QUOTES, 'UTF-8') ?></label>
             <input type="email" id="profile-email" name="email" value="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>" required>
           </div>
-          <button type="submit" class="profile-btn">Save changes</button>
+          <button type="submit" class="profile-btn"><?= htmlspecialchars(t('profile.save_changes', 'Save changes'), ENT_QUOTES, 'UTF-8') ?></button>
         </form>
       </div>
 
       <div class="profile-card">
-        <h3 class="profile-card-title">Change password</h3>
+        <h3 class="profile-card-title"><?= htmlspecialchars(t('profile.change_password', 'Change password'), ENT_QUOTES, 'UTF-8') ?></h3>
         <?php if ($passwordMessage): ?>
           <div class="profile-message profile-message--success"><?= htmlspecialchars($passwordMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <form method="post" class="profile-form">
           <input type="hidden" name="action" value="password">
           <div class="profile-field">
-            <label for="current_password">Current password</label>
+            <label for="current_password"><?= htmlspecialchars(t('profile.current_password', 'Current password'), ENT_QUOTES, 'UTF-8') ?></label>
             <input type="password" id="current_password" name="current_password">
           </div>
           <div class="profile-field">
-            <label for="new_password">New password</label>
+            <label for="new_password"><?= htmlspecialchars(t('profile.new_password', 'New password'), ENT_QUOTES, 'UTF-8') ?></label>
             <input type="password" id="new_password" name="new_password" required minlength="8">
           </div>
           <div class="profile-field">
-            <label for="confirm_password">Confirm new password</label>
+            <label for="confirm_password"><?= htmlspecialchars(t('profile.confirm_new_password', 'Confirm new password'), ENT_QUOTES, 'UTF-8') ?></label>
             <input type="password" id="confirm_password" name="confirm_password" required>
           </div>
-          <button type="submit" class="profile-btn">Update password</button>
+          <button type="submit" class="profile-btn"><?= htmlspecialchars(t('profile.update_password', 'Update password'), ENT_QUOTES, 'UTF-8') ?></button>
         </form>
       </div>
     </section>
 
     <section id="orders" class="profile-section">
-      <h2 class="profile-section-title">Recent Orders</h2>
+      <h2 class="profile-section-title"><?= htmlspecialchars(t('profile.section.recent_orders', 'Recent Orders'), ENT_QUOTES, 'UTF-8') ?></h2>
       <div class="profile-card">
         <?php if ($orders): ?>
           <div class="profile-orders-list">
@@ -217,7 +217,7 @@ $page_title = "Your Profile – STORY";
               <article class="profile-order-card <?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="profile-order-header">
                   <div>
-                    <h4>Order #<?= htmlspecialchars($order['id'], ENT_QUOTES, 'UTF-8') ?></h4>
+                    <h4><?= htmlspecialchars(t('profile.order', 'Order'), ENT_QUOTES, 'UTF-8') ?> #<?= htmlspecialchars($order['id'], ENT_QUOTES, 'UTF-8') ?></h4>
                     <p class="profile-order-meta"><?= htmlspecialchars($order['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?> · $<?= htmlspecialchars($order['total_amount'] ?? '0', ENT_QUOTES, 'UTF-8') ?></p>
                   </div>
                   <span class="profile-order-status"><?= htmlspecialchars(ucfirst($status), ENT_QUOTES, 'UTF-8') ?></span>
@@ -227,34 +227,34 @@ $page_title = "Your Profile – STORY";
                     <?php foreach (array_slice($items, 0, 3) as $item): ?>
                       <div class="profile-order-item">
                         <img src="<?= htmlspecialchars($item['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>" alt="">
-                        <span><?= htmlspecialchars($item['name'] ?? 'Product', ENT_QUOTES, 'UTF-8') ?></span>
+                        <span><?= htmlspecialchars($item['name'] ?? t('product.card.fallback_name', 'Product'), ENT_QUOTES, 'UTF-8') ?></span>
                       </div>
                     <?php endforeach; ?>
                     <?php if (count($items) > 3): ?>
-                      <span class="profile-order-more">+<?= count($items) - 3 ?> more</span>
+                      <span class="profile-order-more">+<?= count($items) - 3 ?> <?= htmlspecialchars(t('profile.more', 'more'), ENT_QUOTES, 'UTF-8') ?></span>
                     <?php endif; ?>
                   </div>
                 <?php endif; ?>
-                <a href="orders.php" class="profile-order-link">View details</a>
+                <a href="<?= htmlspecialchars(localized_path('orders.php'), ENT_QUOTES, 'UTF-8') ?>" class="profile-order-link"><?= htmlspecialchars(t('profile.view_details', 'View details'), ENT_QUOTES, 'UTF-8') ?></a>
               </article>
             <?php endforeach; ?>
           </div>
         <?php else: ?>
-          <p class="profile-empty">No orders yet. <a href="products.php">Start shopping</a></p>
+          <p class="profile-empty"><?= htmlspecialchars(t('profile.no_orders', 'No orders yet.'), ENT_QUOTES, 'UTF-8') ?> <a href="<?= htmlspecialchars(localized_path('products.php'), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('profile.start_shopping', 'Start shopping'), ENT_QUOTES, 'UTF-8') ?></a></p>
         <?php endif; ?>
       </div>
     </section>
 
     <section id="wishlist" class="profile-section">
-      <h2 class="profile-section-title">Wishlist / Favorites</h2>
+      <h2 class="profile-section-title"><?= htmlspecialchars(t('profile.section.wishlist', 'Wishlist / Favorites'), ENT_QUOTES, 'UTF-8') ?></h2>
       <div class="profile-card">
         <div id="profileWishlistContainer" class="profile-wishlist-grid"></div>
-        <p id="profileWishlistEmpty" class="profile-empty" style="display:none;">No favorites yet. <a href="products.php">Browse products</a></p>
+        <p id="profileWishlistEmpty" class="profile-empty" style="display:none;"><?= htmlspecialchars(t('profile.no_favorites', 'No favorites yet.'), ENT_QUOTES, 'UTF-8') ?> <a href="<?= htmlspecialchars(localized_path('products.php'), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('profile.browse_products', 'Browse products'), ENT_QUOTES, 'UTF-8') ?></a></p>
       </div>
     </section>
 
     <section id="settings" class="profile-section">
-      <h2 class="profile-section-title">Settings</h2>
+      <h2 class="profile-section-title"><?= htmlspecialchars(t('profile.section.settings', 'Settings'), ENT_QUOTES, 'UTF-8') ?></h2>
       <div class="profile-card">
         <?php if ($settingsMessage): ?>
           <div class="profile-message profile-message--success"><?= htmlspecialchars($settingsMessage, ENT_QUOTES, 'UTF-8') ?></div>
@@ -263,8 +263,8 @@ $page_title = "Your Profile – STORY";
           <input type="hidden" name="action" value="settings">
           <div class="profile-setting-row">
             <div>
-              <label class="profile-setting-label">Email notifications</label>
-              <p class="profile-setting-desc">Receive order updates and promotions</p>
+              <label class="profile-setting-label"><?= htmlspecialchars(t('profile.email_notifications', 'Email notifications'), ENT_QUOTES, 'UTF-8') ?></label>
+              <p class="profile-setting-desc"><?= htmlspecialchars(t('profile.email_notifications_desc', 'Receive order updates and promotions'), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <label class="profile-toggle">
               <input type="checkbox" name="email_notifications" value="1" checked>
@@ -273,18 +273,18 @@ $page_title = "Your Profile – STORY";
           </div>
           <div class="profile-setting-row">
             <div>
-              <label class="profile-setting-label">Newsletter</label>
-              <p class="profile-setting-desc">Weekly deals and new arrivals</p>
+              <label class="profile-setting-label"><?= htmlspecialchars(t('profile.newsletter', 'Newsletter'), ENT_QUOTES, 'UTF-8') ?></label>
+              <p class="profile-setting-desc"><?= htmlspecialchars(t('profile.newsletter_desc', 'Weekly deals and new arrivals'), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <label class="profile-toggle">
               <input type="checkbox" name="newsletter" value="1">
               <span class="profile-toggle-slider"></span>
             </label>
           </div>
-          <button type="submit" class="profile-btn">Save preferences</button>
+          <button type="submit" class="profile-btn"><?= htmlspecialchars(t('profile.save_preferences', 'Save preferences'), ENT_QUOTES, 'UTF-8') ?></button>
         </form>
         <div class="profile-logout-section">
-          <a href="logout.php" class="profile-btn profile-btn--outline">Log out</a>
+          <a href="logout.php" class="profile-btn profile-btn--outline"><?= htmlspecialchars(t('profile.logout', 'Log out'), ENT_QUOTES, 'UTF-8') ?></a>
         </div>
       </div>
     </section>

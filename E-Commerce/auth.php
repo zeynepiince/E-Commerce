@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$page_title = 'Sign In | STORY – Smart Online Store';
+$page_title = 'Sign In | ZERA – Smart Online Store';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -115,7 +115,7 @@ $page_title = 'Sign In | STORY – Smart Online Store';
     <div class="auth-hero">
       <div class="auth-hero-overlay"></div>
       <div class="auth-hero-content">
-        <h1 class="auth-hero-title">STORY</h1>
+        <h1 class="auth-hero-title">ZERA</h1>
         <p class="auth-hero-tagline">Smart Online Store</p>
         <p class="auth-hero-desc">Discover curated fashion, tech, and lifestyle essentials.</p>
       </div>

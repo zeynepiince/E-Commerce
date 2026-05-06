@@ -1,72 +1,78 @@
+<?php
+if (!function_exists("t")) {
+  require_once __DIR__ . "/../functions.php";
+}
+$appLang = get_current_lang();
+?>
 <footer class="site-footer">
   <div class="footer-inner">
 
     <!-- Support -->
     <div class="footer-col">
-      <h5>Support</h5>
+      <h5><?= htmlspecialchars(t("footer.support", "Support"), ENT_QUOTES, 'UTF-8') ?></h5>
       <div class="footer-link-group">
-        <a href="#" onclick="toggleFooterInfo(event, 'help')">Help Center</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'help')"><?= htmlspecialchars(t("footer.help_center", "Help Center"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="help" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Find guides, FAQs, and support articles to help you with orders, shipping, and returns.</p>
+          <p><?= htmlspecialchars(t("footer.help_center_desc", "Find guides, FAQs, and support articles to help you with orders, shipping, and returns."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'shipping')">Shipping & Returns</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'shipping')"><?= htmlspecialchars(t("footer.shipping_returns", "Shipping & Returns"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="shipping" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Learn about shipping options, delivery times, and our return policy.</p>
+          <p><?= htmlspecialchars(t("footer.shipping_returns_desc", "Learn about shipping options, delivery times, and our return policy."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'faq')">FAQ</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'faq')"><?= htmlspecialchars(t("footer.faq", "FAQ"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="faq" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Answers to common questions about products, accounts, and payments.</p>
+          <p><?= htmlspecialchars(t("footer.faq_desc", "Answers to common questions about products, accounts, and payments."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
       </div>
     </div>
 
     <!-- About -->
     <div class="footer-col">
-      <h5>About</h5>
+      <h5><?= htmlspecialchars(t("footer.about", "About"), ENT_QUOTES, 'UTF-8') ?></h5>
       <div class="footer-link-group">
-        <a href="#" onclick="toggleFooterInfo(event, 'ourStory')">Our Story</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'ourStory')"><?= htmlspecialchars(t("footer.our_story", "Our Story"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="ourStory" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Learn how STORY started, our mission, and what inspires our collections.</p>
+          <p><?= htmlspecialchars(t("footer.our_story_desc", "Learn how ZERA started, our mission, and what inspires our collections."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'careers')">Careers</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'careers')"><?= htmlspecialchars(t("footer.careers", "Careers"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="careers" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Explore career opportunities and join our team in shaping the STORY experience.</p>
+          <p><?= htmlspecialchars(t("footer.careers_desc", "Explore career opportunities and join our team in shaping the ZERA experience."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'contact')">Contact</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'contact')"><?= htmlspecialchars(t("footer.contact", "Contact"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="contact" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Get in touch with our support team for questions or feedback.</p>
+          <p><?= htmlspecialchars(t("footer.contact_desc", "Get in touch with our support team for questions or feedback."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
       </div>
     </div>
 
     <!-- Follow -->
     <div class="footer-col">
-      <h5>Follow</h5>
+      <h5><?= htmlspecialchars(t("footer.follow", "Follow"), ENT_QUOTES, 'UTF-8') ?></h5>
       <div class="footer-link-group">
-        <a href="#" onclick="toggleFooterInfo(event, 'instagram')">Instagram</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'instagram')"><?= htmlspecialchars(t("footer.instagram", "Instagram"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="instagram" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Follow us on Instagram for the latest product drops, promotions, and stories.</p>
+          <p><?= htmlspecialchars(t("footer.instagram_desc", "Follow us on Instagram for the latest product drops, promotions, and stories."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'twitter')">Twitter</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'twitter')"><?= htmlspecialchars(t("footer.twitter", "Twitter"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="twitter" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Stay updated with news, product announcements, and community highlights on Twitter.</p>
+          <p><?= htmlspecialchars(t("footer.twitter_desc", "Stay updated with news, product announcements, and community highlights on Twitter."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
 
-        <a href="#" onclick="toggleFooterInfo(event, 'facebook')">Facebook</a>
+        <a href="#" onclick="toggleFooterInfo(event, 'facebook')"><?= htmlspecialchars(t("footer.facebook", "Facebook"), ENT_QUOTES, 'UTF-8') ?></a>
         <div id="facebook" class="footer-info" style="display:none; font-size:13px; margin-top:5px;">
-          <p>Join our Facebook community to share feedback, reviews, and connect with other fans.</p>
+          <p><?= htmlspecialchars(t("footer.facebook_desc", "Join our Facebook community to share feedback, reviews, and connect with other fans."), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
       </div>
     </div>
 
     <!-- Copyright -->
     <div class="footer-col">
-      <p>&copy; <?= date('Y') ?> STORY. All rights reserved.</p>
+      <p>&copy; <?= date('Y') ?> ZERA. <?= htmlspecialchars(t("footer.rights", "All rights reserved."), ENT_QUOTES, 'UTF-8') ?></p>
     </div>
 
   </div>
@@ -95,13 +101,14 @@ function toggleFooterInfo(e, id) {
 <button class="chat-toggle" onclick="toggleChat()">💬</button>
 
 <div class="chatbot" id="chatbot">
-  <div class="chat-header">Customer Support</div>
+  <div class="chat-header"><?= htmlspecialchars(t("chat.title", "Customer Support"), ENT_QUOTES, 'UTF-8') ?></div>
   <div class="chat-body" id="chatBody">
-    <div class="msg bot">Hi 👋 Looking for recommendations or help?</div>
+    <div class="msg bot"><?= htmlspecialchars(t("chat.welcome", "Hi 👋 Looking for recommendations or help?"), ENT_QUOTES, 'UTF-8') ?></div>
   </div>
+  <div id="quick-actions" class="qa-container"></div>
   <div class="chat-input">
-    <input id="userInput" placeholder="Type your message..." />
-    <button onclick="sendMessage()">Send</button>
+    <input id="userInput" placeholder="<?= htmlspecialchars(t("chat.input_placeholder", "Type your message..."), ENT_QUOTES, 'UTF-8') ?>" />
+    <button onclick="sendMessage()"><?= htmlspecialchars(t("chat.send", "Send"), ENT_QUOTES, 'UTF-8') ?></button>
   </div>
 </div>
 
@@ -114,8 +121,8 @@ function toggleFooterInfo(e, id) {
     <button type="button" class="auth-modal-close" onclick="toggleAuthModal()" aria-label="Close">×</button>
     <div class="auth-modal-content">
       <div class="auth-modal-tabs">
-        <button type="button" class="auth-modal-tab active" data-tab="signin">Sign In</button>
-        <button type="button" class="auth-modal-tab" data-tab="join">Join</button>
+        <button type="button" class="auth-modal-tab active" data-tab="signin"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
+        <button type="button" class="auth-modal-tab" data-tab="join"><?= htmlspecialchars(t("auth.join", "Join"), ENT_QUOTES, 'UTF-8') ?></button>
       </div>
       <div class="auth-modal-forms">
         <form id="auth-signin-form" class="auth-modal-form active">
@@ -126,7 +133,7 @@ function toggleFooterInfo(e, id) {
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
             </span>
-            <input type="email" id="auth-signin-email" name="email" placeholder="Email" required autocomplete="email">
+            <input type="email" id="auth-signin-email" name="email" placeholder="<?= htmlspecialchars(t("auth.email", "Email"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email">
           </div>
           <div class="auth-input-group">
             <span class="auth-input-icon" aria-hidden="true">
@@ -135,12 +142,12 @@ function toggleFooterInfo(e, id) {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </span>
-            <input type="password" id="auth-signin-password" name="password" placeholder="Password" required autocomplete="current-password">
+            <input type="password" id="auth-signin-password" name="password" placeholder="<?= htmlspecialchars(t("auth.password", "Password"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="current-password">
           </div>
-          <a href="#" class="auth-forgot-link">Forgot password?</a>
-          <button type="submit" class="auth-modal-btn">Sign In</button>
+          <a href="#" class="auth-forgot-link"><?= htmlspecialchars(t("auth.forgot_password", "Forgot password?"), ENT_QUOTES, 'UTF-8') ?></a>
+          <button type="submit" class="auth-modal-btn"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
           <p class="auth-modal-switch">
-            Don't have an account? <button type="button" class="auth-modal-link" data-switch="join">Join</button>
+            <?= htmlspecialchars(t("auth.no_account", "Don't have an account?"), ENT_QUOTES, 'UTF-8') ?> <button type="button" class="auth-modal-link" data-switch="join"><?= htmlspecialchars(t("auth.join", "Join"), ENT_QUOTES, 'UTF-8') ?></button>
           </p>
         </form>
         <form id="auth-join-form" class="auth-modal-form">
@@ -151,7 +158,7 @@ function toggleFooterInfo(e, id) {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
             </span>
-            <input type="text" id="auth-join-name" name="name" placeholder="Full Name" required autocomplete="name">
+            <input type="text" id="auth-join-name" name="name" placeholder="<?= htmlspecialchars(t("auth.full_name", "Full Name"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="name">
           </div>
           <div class="auth-input-group">
             <span class="auth-input-icon" aria-hidden="true">
@@ -160,7 +167,7 @@ function toggleFooterInfo(e, id) {
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
             </span>
-            <input type="email" id="auth-join-email" name="email" placeholder="Email" required autocomplete="email">
+            <input type="email" id="auth-join-email" name="email" placeholder="<?= htmlspecialchars(t("auth.email", "Email"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email">
           </div>
           <div class="auth-input-group">
             <span class="auth-input-icon" aria-hidden="true">
@@ -169,7 +176,7 @@ function toggleFooterInfo(e, id) {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </span>
-            <input type="password" id="auth-join-password" name="password" placeholder="Password" required autocomplete="new-password">
+            <input type="password" id="auth-join-password" name="password" placeholder="<?= htmlspecialchars(t("auth.password", "Password"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="new-password">
           </div>
           <div class="auth-input-group">
             <span class="auth-input-icon" aria-hidden="true">
@@ -178,11 +185,11 @@ function toggleFooterInfo(e, id) {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </span>
-            <input type="password" id="auth-join-confirm" name="confirm" placeholder="Confirm Password" required autocomplete="new-password">
+            <input type="password" id="auth-join-confirm" name="confirm" placeholder="<?= htmlspecialchars(t("auth.confirm_password", "Confirm Password"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="new-password">
           </div>
-          <button type="submit" class="auth-modal-btn">Create Account</button>
+          <button type="submit" class="auth-modal-btn"><?= htmlspecialchars(t("auth.create_account", "Create Account"), ENT_QUOTES, 'UTF-8') ?></button>
           <p class="auth-modal-switch">
-            Already have an account? <button type="button" class="auth-modal-link" data-switch="signin">Sign In</button>
+            <?= htmlspecialchars(t("auth.have_account", "Already have an account?"), ENT_QUOTES, 'UTF-8') ?> <button type="button" class="auth-modal-link" data-switch="signin"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
           </p>
         </form>
       </div>
@@ -191,13 +198,17 @@ function toggleFooterInfo(e, id) {
 </div>
 
 <div class="cart" id="cart">
-  <h3>Your Cart</h3>
+  <h3><?= htmlspecialchars(t("cart.title", "Your Cart"), ENT_QUOTES, 'UTF-8') ?></h3>
   <div id="cartItems"></div>
-  <p><strong>Total: $<span id="total">0</span></strong></p>
+  <p><strong><?= htmlspecialchars(t("cart.total", "Total"), ENT_QUOTES, 'UTF-8') ?>: $<span id="total">0</span></strong></p>
   <button onclick="goToCheckout()" class="btn-full-width">
-    Checkout
+    <?= htmlspecialchars(t("cart.checkout", "Checkout"), ENT_QUOTES, 'UTF-8') ?>
   </button>
 </div>
+
+<script>
+window.APP_LANG = <?= json_encode($appLang) ?>;
+</script>
 
 <script src="assets/js/main.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/main.js')) ?>"></script>
 <?php if (isset($is_homepage) && $is_homepage): ?>

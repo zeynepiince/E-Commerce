@@ -3,85 +3,48 @@ let total = 0;
 let favorites = [];
 let recentlyViewed = [];
 let lastChatIntent = "";
-const CHAT_QUICK_PROMPTS_BY_PAGE = {
-  default: [
-    "Suggest running shoes under 100",
-    "How long does shipping take?",
-    "What is your return policy?",
-    "What's in my cart?"
-  ],
-  home: [
-    "What are today's featured products?",
-    "Suggest popular items under 100",
-    "How long does shipping take?",
-    "What is your return policy?"
-  ],
-  products: [
-    "Suggest electronics under 150",
-    "Show the cheapest products",
-    "What are the newest products?",
-    "Do you have Nike products?"
-  ],
-  checkout: [
-    "How long does shipping take?",
-    "Is payment secure?",
-    "What is your return policy?",
-    "What's in my cart?"
-  ],
-  wishlist: [
-    "Suggest items similar to my wishlist",
-    "Show the lowest-priced options",
-    "Are any of these out of stock?",
-    "Open these in the products page"
-  ]
-};
-const CHAT_QUICK_PROMPTS_CART_EMPTY = [
-  "Suggest products under 100",
-  "Show most popular items",
-  "How long does shipping take?",
-  "What is your return policy?"
+let lastUserMessage = "";
+let lastDidYouMeanShownAt = 0;
+let botReplyCountSinceDidYouMean = 0;
+let lastRenderedCartCount = 0;
+const CHAT_QUICK_ACTIONS_DEFAULT = [
+  { en: "🛍️ Recommend me a product", tr: "🛍️ Bana ürün öner" },
+  { en: "📦 Track my order", tr: "📦 Siparişimi takip et" },
+  { en: "💳 Payment options", tr: "💳 Ödeme seçenekleri" },
+  { en: "🔁 How do returns work?", tr: "🔁 İade nasıl yapılır?" }
 ];
-const CHAT_QUICK_PROMPTS_CART_FULL = [
-  "What's in my cart?",
-  "Suggest best options before checkout",
-  "Is payment secure?",
-  "How is shipping cost calculated?"
+const CHAT_QUICK_ACTIONS_PRODUCT = [
+  { en: "Wireless only", tr: "Kablosuz olsun" },
+  { en: "Cheaper alternatives", tr: "Daha ucuz alternatif" },
+  { en: "Best sellers", tr: "En çok satanlar" },
+  { en: "Under 500 TL", tr: "500 TL altı" }
 ];
-const CHAT_QUICK_PROMPTS_BY_INTENT = {
-  product_search: [
-    "Show cheaper options",
-    "Show only black ones",
-    "Open these in products page",
-    "Show in-stock items"
-  ],
-  shipping: [
-    "What is the free shipping threshold?",
-    "When will my order arrive?",
-    "Which shipping carrier do you use?",
-    "Do you offer fast delivery?"
-  ],
-  returns: [
-    "How many days do I have for returns?",
-    "Is return shipping free?",
-    "Can I exchange items?",
-    "Summarize your return policy"
-  ],
-  payment: [
-    "What payment methods do you support?",
-    "Do you offer installments?",
-    "Do you support cash on delivery?",
-    "What happens if payment fails?"
-  ],
-  order_status: [
-    "Check my order status again",
-    "Has it been shipped?",
-    "What is the estimated delivery date?",
-    "Can I cancel my order?"
-  ]
-};
+const CHAT_QUICK_ACTIONS_ORDER = [
+  { en: "Where is my shipment?", tr: "Kargo nerede?" },
+  { en: "Delivery time", tr: "Teslimat süresi" },
+  { en: "Cancel my order", tr: "Siparişi iptal et" }
+];
+const CHAT_QUICK_ACTIONS_PAYMENT = [
+  { en: "Payment options", tr: "Ödeme seçenekleri" },
+  { en: "Do you offer installments?", tr: "Taksit yapılıyor mu?" }
+];
+const CHAT_QUICK_ACTIONS_RETURNS_SHIPPING = [
+  { en: "How do returns work?", tr: "İade nasıl yapılır?" },
+  { en: "Shipping time", tr: "Kargo süresi" }
+];
 
 function appUrl(path) {
-  return new URL(path, window.location.href).toString();
+  const url = new URL(path, window.location.href);
+  const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "";
+  if (lang && !url.searchParams.get("lang")) {
+    url.searchParams.set("lang", lang);
+  }
+  return url.toString();
+}
+
+function uiText(en, tr) {
+  const lang = (typeof window.APP_LANG === "string" ? window.APP_LANG : "en").toLowerCase();
+  return lang === "tr" ? tr : en;
 }
 
 // Initialize cart from localStorage on load
@@ -109,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (checkoutSummary) {
     renderCheckoutSummary();
     initCheckoutPayment();
+    initCheckoutPhoneField();
     const submitBtn = document.getElementById("checkoutSubmit");
     if (submitBtn) submitBtn.disabled = cart.length === 0;
   }
@@ -124,6 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const chatInput = document.getElementById("userInput");
   if (chatInput) {
+    chatInput.addEventListener("input", onUserTyping);
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -148,68 +113,153 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function renderChatQuickPrompts(force = false) {
-  const chatBody = document.getElementById("chatBody");
-  if (!chatBody) return;
-  const existing = document.getElementById("chatQuickPrompts");
-  if (existing && !force) return;
-  if (existing && force) existing.remove();
-
-  const wrap = document.createElement("div");
-  wrap.className = "msg bot";
-  wrap.id = "chatQuickPrompts";
-  wrap.style.marginTop = "8px";
-
-  const title = document.createElement("div");
-  title.textContent = "Try one of these:";
-  title.style.fontSize = "12px";
-  title.style.color = "#6b7280";
-  title.style.marginBottom = "8px";
-  wrap.appendChild(title);
-
-  const buttons = document.createElement("div");
-  buttons.style.display = "flex";
-  buttons.style.flexWrap = "wrap";
-  buttons.style.gap = "6px";
-
-  const pagePrompts = getChatQuickPromptsForPage();
-  pagePrompts.forEach((text) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = text;
-    btn.style.fontSize = "12px";
-    btn.style.padding = "6px 10px";
-    btn.style.border = "1px solid #e5e7eb";
-    btn.style.background = "#fff";
-    btn.style.borderRadius = "999px";
-    btn.style.cursor = "pointer";
-    btn.onclick = () => sendQuickPrompt(text);
-    buttons.appendChild(btn);
+  const container = document.getElementById("quick-actions");
+  if (!container) return;
+  if (!force && container.childElementCount > 0) return;
+  container.innerHTML = "";
+  const actions = getContextAwareQuickPrompts().slice(0, 5).map(localizeQuickAction);
+  actions.forEach((text) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "qa-chip";
+    chip.textContent = text;
+    chip.onclick = () => sendQuickPrompt(text);
+    container.appendChild(chip);
   });
-
-  wrap.appendChild(buttons);
-  chatBody.appendChild(wrap);
+  container.style.opacity = "1";
 }
 
-function getChatQuickPromptsForPage() {
-  if (lastChatIntent && CHAT_QUICK_PROMPTS_BY_INTENT[lastChatIntent]) {
-    return CHAT_QUICK_PROMPTS_BY_INTENT[lastChatIntent];
-  }
+function getContextAwareQuickPrompts() {
+  const msg = String(lastUserMessage || "").toLowerCase();
+  if (lastChatIntent === "product_search") return CHAT_QUICK_ACTIONS_PRODUCT;
+  if (lastChatIntent === "order_status" || msg.includes("order") || msg.includes("sipariş")) return CHAT_QUICK_ACTIONS_ORDER;
+  if (lastChatIntent === "payment" || msg.includes("payment") || msg.includes("ödeme")) return CHAT_QUICK_ACTIONS_PAYMENT;
+  if (lastChatIntent === "returns" || lastChatIntent === "shipping" || msg.includes("return") || msg.includes("kargo")) return CHAT_QUICK_ACTIONS_RETURNS_SHIPPING;
+  return CHAT_QUICK_ACTIONS_DEFAULT;
+}
 
-  const cartCount = Array.isArray(cart) ? cart.reduce((sum, item) => sum + (item.qty || 0), 0) : 0;
-  if (cartCount > 0) return CHAT_QUICK_PROMPTS_CART_FULL;
-
-  const path = (window.location.pathname || "").toLowerCase();
-  if (path.includes("index.php") || path.endsWith("/e-commerce/") || path.endsWith("/e-commerce")) {
-    return CHAT_QUICK_PROMPTS_BY_PAGE.home;
-  }
-  if (path.includes("products.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.products;
-  if (path.includes("checkout.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.checkout;
-  if (path.includes("wishlist.php")) return CHAT_QUICK_PROMPTS_BY_PAGE.wishlist;
-  return CHAT_QUICK_PROMPTS_BY_PAGE.default.length ? CHAT_QUICK_PROMPTS_BY_PAGE.default : CHAT_QUICK_PROMPTS_CART_EMPTY;
+function localizeQuickAction(item) {
+  if (typeof item === "string") return item;
+  const lang = (typeof window.APP_LANG === "string" ? window.APP_LANG : "en").toLowerCase();
+  if (lang === "tr") return item.tr || item.en || "";
+  return item.en || item.tr || "";
 }
 
 function sendQuickPrompt(text) {
+  const input = document.getElementById("userInput");
+  if (input) {
+    input.value = text;
+  }
   sendChatMessage(text);
+}
+
+function onUserTyping() {
+  const container = document.getElementById("quick-actions");
+  if (!container) return;
+  container.style.opacity = "0.35";
+}
+
+function renderDidYouMean(chatBody, suggestions) {
+  if (!chatBody || !Array.isArray(suggestions) || !suggestions.length) return;
+  const now = Date.now();
+  const minIntervalMs = 90000; // at most once every 90s
+  const minBotRepliesBetween = 3; // and keep at least 3 bot replies between prompts
+  if ((now - lastDidYouMeanShownAt) < minIntervalMs) return;
+  if (botReplyCountSinceDidYouMean < minBotRepliesBetween) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg bot chat-didyoumean";
+
+  const title = document.createElement("div");
+  title.className = "chat-didyoumean-title";
+  title.textContent = "Bunu mu demek istediniz?";
+  wrap.appendChild(title);
+
+  const chips = document.createElement("div");
+  chips.className = "chat-didyoumean-chips";
+  suggestions.slice(0, 4).forEach((text) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chat-didyoumean-chip";
+    chip.textContent = text;
+    chip.onclick = () => sendQuickPrompt(text);
+    chips.appendChild(chip);
+  });
+  wrap.appendChild(chips);
+  chatBody.appendChild(wrap);
+  lastDidYouMeanShownAt = now;
+  botReplyCountSinceDidYouMean = 0;
+}
+
+function renderChatFeedbackControls(chatBody, botMsg, payload) {
+  if (!chatBody || !botMsg) return;
+  const wrap = document.createElement("div");
+  wrap.className = "chat-feedback";
+
+  const label = document.createElement("span");
+  label.className = "chat-feedback-label";
+  label.textContent = "Was this helpful?";
+  wrap.appendChild(label);
+
+  const yesBtn = document.createElement("button");
+  yesBtn.type = "button";
+  yesBtn.className = "chat-feedback-btn";
+  yesBtn.textContent = "👍";
+
+  const noBtn = document.createElement("button");
+  noBtn.type = "button";
+  noBtn.className = "chat-feedback-btn";
+  noBtn.textContent = "👎";
+
+  const lockButtons = (activeBtn) => {
+    [yesBtn, noBtn].forEach((btn) => {
+      btn.disabled = true;
+      if (btn === activeBtn) btn.classList.add("chat-feedback-btn--active");
+    });
+  };
+
+  yesBtn.onclick = () => submitChatFeedback(true, payload, lockButtons, yesBtn, wrap);
+  noBtn.onclick = () => submitChatFeedback(false, payload, lockButtons, noBtn, wrap);
+
+  wrap.appendChild(yesBtn);
+  wrap.appendChild(noBtn);
+  chatBody.appendChild(wrap);
+}
+
+function submitChatFeedback(isHelpful, payload, lockButtons, activeBtn, wrapEl) {
+  lockButtons(activeBtn);
+  fetch(appUrl("chatbot_feedback.php"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "submit",
+      helpful: isHelpful ? 1 : 0,
+      intent: payload.intent || "general",
+      source: payload.source || "rule",
+      confidence: typeof payload.confidence === "number" ? payload.confidence : Number(payload.confidence || 0),
+      used_ai: !!payload.used_ai,
+      escalated_to_human: !!payload.escalated_to_human,
+      user_message: payload.user_message || "",
+      bot_reply: payload.bot_reply || "",
+      page: window.location.pathname || ""
+    })
+  })
+    .then(() => {
+      if (wrapEl) {
+        const thanks = document.createElement("span");
+        thanks.className = "chat-feedback-thanks";
+        thanks.textContent = "Thanks for your feedback!";
+        wrapEl.appendChild(thanks);
+      }
+    })
+    .catch(() => {
+      if (wrapEl) {
+        const error = document.createElement("span");
+        error.className = "chat-feedback-thanks";
+        error.textContent = "Could not save feedback.";
+        wrapEl.appendChild(error);
+      }
+    });
 }
 
 function loadFavorites() {
@@ -223,7 +273,7 @@ function loadFavorites() {
         name: f.name,
         imageUrl: f.imageUrl || null,
         price: Number.isFinite(Number(f.price)) ? Number(f.price) : null,
-        seller: f.seller || "STORY Partner",
+        seller: f.seller || "ZERA Partner",
         shipping: f.shipping || "Free shipping",
         qty: typeof f.qty === "number" ? f.qty : 1,
       }));
@@ -429,7 +479,7 @@ function toggleFavorite(id, name, imageUrl, price = null) {
       name,
       imageUrl: imageUrl || null,
       price: typeof finalPrice === "number" ? finalPrice : 0,
-      seller: "STORY Partner",
+      seller: "ZERA Partner",
       shipping: "Free shipping",
       qty: 1,
     });
@@ -453,7 +503,9 @@ function renderWishlist() {
   if (!container) return;
 
   if (countEl) {
-    countEl.textContent = favorites.length ? ` (${favorites.length} ${favorites.length === 1 ? "item" : "items"})` : "";
+    countEl.textContent = favorites.length
+      ? ` (${favorites.length} ${uiText("items", "ürün")})`
+      : "";
   }
 
   container.innerHTML = "";
@@ -462,9 +514,9 @@ function renderWishlist() {
     container.innerHTML = `
       <div class="wishlist-empty">
         <div class="wishlist-empty-icon">♡</div>
-        <h2 class="wishlist-empty-title">Your wishlist is empty</h2>
-        <p class="wishlist-empty-text">Save items you like by clicking the heart icon on product cards.</p>
-        <a href="products.php" class="wishlist-empty-btn">Explore Products</a>
+        <h2 class="wishlist-empty-title">${uiText("Your wishlist is empty", "Favorileriniz boş")}</h2>
+        <p class="wishlist-empty-text">${uiText("Save items you like by clicking the heart icon on product cards.", "Beğendiğiniz ürünleri kalp ikonuna tıklayarak kaydedin.")}</p>
+        <a href="products.php" class="wishlist-empty-btn">${uiText("Explore Products", "Ürünleri Keşfet")}</a>
       </div>
     `;
     return;
@@ -487,7 +539,7 @@ function renderWishlist() {
       <div class="wishlist-card-body">
         <a href="product_detail.php?name=${encodeURIComponent(f.name || "Product")}" class="wishlist-card-name">${safeName}</a>
         <p class="wishlist-card-price">$${priceDisplay.toFixed(2)}</p>
-        <p class="wishlist-card-meta">${f.seller || "STORY Partner"} · ${f.shipping || "Free shipping"}</p>
+        <p class="wishlist-card-meta">${f.seller || "ZERA Partner"} · ${f.shipping || "Free shipping"}</p>
         <div class="wishlist-card-actions">
           <button type="button" class="wishlist-card-add" onclick="addFavoriteToCart(${f.id})">Add to Cart</button>
           <button type="button" class="wishlist-card-remove" onclick="wishlistRemove(${f.id})">Remove from Wishlist</button>
@@ -507,7 +559,7 @@ function renderWishlistPreview() {
   container.innerHTML = "";
 
   if (!favorites.length) {
-    container.innerHTML = "<p style=\"font-size:13px;color:#6b7280;\">You have no favourites yet.</p>";
+    container.innerHTML = `<p style="font-size:13px;color:#6b7280;">${uiText("You have no favourites yet.", "Henüz favoriniz yok.")}</p>`;
     return;
   }
 
@@ -678,13 +730,54 @@ function toggleCart() {
   const backdrop = document.getElementById("cartBackdrop");
   if (!cartEl) return;
   cartEl.classList.toggle("active");
+  document.body.classList.toggle("cart-open", cartEl.classList.contains("active"));
   if (backdrop) {
     backdrop.classList.toggle("active");
   }
 }
 
-function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving) {
-  const existing = cart.find(item => item.id === id);
+function addToCartWithSelectedSize(triggerEl, id, name, price, imageUrl, seller, shipping, extra, saving) {
+  const host = triggerEl && typeof triggerEl.closest === "function" ? triggerEl.closest("[data-size-host]") : null;
+  const picker = host ? host.querySelector(".product-size-picker") : null;
+  const sizeSelect = host ? host.querySelector(".product-size-select") : null;
+  const sizeHidden = host ? host.querySelector(".product-size-selected") : null;
+  const selectedChip = host ? host.querySelector(".size-chip--pick.is-selected") : null;
+  const selectedSize = sizeSelect
+    ? String(sizeSelect.value || "").trim()
+    : (sizeHidden ? String(sizeHidden.value || "").trim() : (selectedChip ? String(selectedChip.dataset.size || "").trim() : ""));
+  if ((sizeSelect || sizeHidden || selectedChip) && !selectedSize) {
+    if (picker) picker.classList.add("is-open");
+    if (sizeSelect) sizeSelect.focus();
+    return;
+  }
+  addToCart(id, name, price, imageUrl, seller, shipping, extra, saving, selectedSize);
+}
+
+function selectProductSize(triggerEl, size) {
+  const host = triggerEl && typeof triggerEl.closest === "function" ? triggerEl.closest("[data-size-host]") : null;
+  if (!host) return;
+  host.querySelectorAll(".size-chip--pick").forEach((chip) => chip.classList.remove("is-selected"));
+  triggerEl.classList.add("is-selected");
+  triggerEl.dataset.size = String(size || "");
+  const hidden = host.querySelector(".product-size-selected");
+  if (hidden) hidden.value = String(size || "");
+}
+
+function toggleSizePicker(triggerEl) {
+  const host = triggerEl && typeof triggerEl.closest === "function" ? triggerEl.closest("[data-size-host]") : null;
+  if (!host) return;
+  const picker = host.querySelector(".product-size-picker");
+  if (!picker) return;
+  picker.classList.toggle("is-open");
+  if (picker.classList.contains("is-open")) {
+    const sizeSelect = host.querySelector(".product-size-select");
+    if (sizeSelect) sizeSelect.focus();
+  }
+}
+
+function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving, selectedSize) {
+  const normalizedSize = typeof selectedSize === "string" ? selectedSize.trim() : "";
+  const existing = cart.find(item => item.id === id && (item.size || "") === normalizedSize);
 
   if (existing) {
     existing.qty++;
@@ -698,12 +791,35 @@ function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving) {
       shipping: shipping || "Free shipping",
       extra: extra || "Popular choice · Ships in 2 days",
       saving: saving || 0,
+      size: normalizedSize,
       qty: 1
     });
   }
 
   renderCart();
   saveCart();
+  showAddToCartFeedback(name || "Product");
+}
+
+function showAddToCartFeedback(name) {
+  let toast = document.getElementById("cartToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "cartToast";
+    toast.className = "cart-toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = uiText(`${name} added to cart`, `${name} sepete eklendi`);
+  toast.classList.add("show");
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, 1300);
+
+  const cartEl = document.getElementById("cart");
+  if (cartEl) {
+    cartEl.classList.add("flash");
+    setTimeout(() => cartEl.classList.remove("flash"), 500);
+  }
 }
 
 function toggleChat() {
@@ -730,6 +846,7 @@ function sendChatMessage(message) {
   if (!chatBody) return;
   const finalMessage = String(message || "").trim();
   if (!finalMessage) return;
+  lastUserMessage = finalMessage;
 
   const userMsg = document.createElement("div");
   userMsg.className = "msg user";
@@ -741,24 +858,46 @@ function sendChatMessage(message) {
     cart,
     page: window.location.pathname
   };
+  const typingMsg = document.createElement("div");
+  typingMsg.className = "msg bot msg-typing";
+  typingMsg.id = "chatTypingIndicator";
+  typingMsg.innerHTML = `
+    <span class="typing-dot"></span>
+    <span class="typing-dot"></span>
+    <span class="typing-dot"></span>
+  `;
+  chatBody.appendChild(typingMsg);
+  chatBody.scrollTop = chatBody.scrollHeight;
 
-  fetch(appUrl("chatbot.php"), {
+  fetch(appUrl("chatbot_api.php"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   })
     .then(res => res.json())
     .then(data => {
+      const typing = document.getElementById("chatTypingIndicator");
+      if (typing) typing.remove();
       const botMsg = document.createElement("div");
       botMsg.className = "msg bot";
-      botMsg.innerText = data.reply ?? "Sorry, I didn’t understand.";
+      botMsg.innerText = data.reply ?? uiText("Sorry, I didn’t understand.", "Üzgünüm, anlayamadım.");
       chatBody.appendChild(botMsg);
+      botReplyCountSinceDidYouMean += 1;
+      renderChatFeedbackControls(chatBody, botMsg, {
+        intent: data.intent || "",
+        source: data.source || "rule",
+        confidence: data.confidence ?? 0,
+        used_ai: !!data.used_ai,
+        escalated_to_human: !!data.escalated_to_human,
+        user_message: finalMessage,
+        bot_reply: data.reply || ""
+      });
       lastChatIntent = typeof data.intent === "string" ? data.intent : "";
 
       const suggested = Array.isArray(data.suggested_products) ? data.suggested_products : [];
       if (suggested.length) {
         const wrap = document.createElement("div");
-        wrap.className = "msg bot";
+        wrap.className = "msg bot chat-product-list";
         wrap.style.marginTop = "8px";
         wrap.innerHTML = suggested.map((p) => {
           const id = Number(p.product_id || 0);
@@ -766,34 +905,44 @@ function sendChatMessage(message) {
           const image = String(p.image_url || "https://images.unsplash.com/photo-1542291026-7eec264c27ff").replace(/'/g, "\\'");
           const price = Number(p.price || 0);
           return `
-            <div style="display:flex;gap:8px;align-items:center;border:1px solid #e5e7eb;background:#fff;padding:8px;border-radius:10px;margin-bottom:8px;">
-              <img src="${image}" alt="${name}" style="width:46px;height:46px;object-fit:cover;border-radius:8px;">
+            <div class="chat-product-card">
+              <img src="${image}" alt="${name}" class="chat-product-card-image">
               <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
-                <div style="font-size:12px;color:#6b7280;">$${price.toFixed(2)}</div>
+                <div class="chat-product-card-title">${name}</div>
+                <div class="chat-product-card-price">$${price.toFixed(2)}</div>
+                <div class="chat-product-card-meta">ZERA Partner · Free shipping</div>
               </div>
-              <a href="product_detail.php?name=${encodeURIComponent(name)}" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid #e5e7eb;color:#374151;text-decoration:none;">View</a>
-              <button style="font-size:12px;padding:6px 10px;border:none;border-radius:8px;background:#FF6F00;color:#fff;cursor:pointer;" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">Add</button>
+              <a href="product_detail.php?name=${encodeURIComponent(name)}" class="chat-product-card-view">View</a>
+              <button class="chat-product-card-add" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">Add</button>
             </div>
           `;
         }).join("");
         chatBody.appendChild(wrap);
+      }
+      const shouldShowDidYouMean =
+        (Number(data.confidence || 0) < 0.55) &&
+        !data.asked_clarification &&
+        !data.escalated_to_human;
+      if (shouldShowDidYouMean) {
+        renderDidYouMean(chatBody, data.did_you_mean);
       }
       const redirectUrl = typeof data.redirect_url === "string" ? data.redirect_url : "";
       if (redirectUrl) {
         const cta = document.createElement("div");
         cta.className = "msg bot";
         cta.style.marginTop = "6px";
-        cta.innerHTML = `<a href="${redirectUrl}" style="display:inline-block;padding:8px 12px;border-radius:8px;background:#111827;color:#fff;text-decoration:none;font-size:12px;">Show all matching products</a>`;
+        cta.innerHTML = `<a href="${redirectUrl}" style="display:inline-block;padding:8px 12px;border-radius:8px;background:#111827;color:#fff;text-decoration:none;font-size:12px;">${uiText("Show all matching products", "Eşleşen tüm ürünleri göster")}</a>`;
         chatBody.appendChild(cta);
       }
       renderChatQuickPrompts(true);
       chatBody.scrollTop = chatBody.scrollHeight;
     })
     .catch(() => {
+      const typing = document.getElementById("chatTypingIndicator");
+      if (typing) typing.remove();
       const errMsg = document.createElement("div");
       errMsg.className = "msg bot";
-      errMsg.innerText = "Server error.";
+      errMsg.innerText = uiText("Server error.", "Sunucu hatası.");
       chatBody.appendChild(errMsg);
     });
 }
@@ -819,8 +968,9 @@ function renderCart() {
       </div>
       <div class="cart-item-info">
         <strong>${item.name}</strong>
+        ${(item.size || "") ? `<div class="cart-extra">${uiText("Size", "Beden")}: ${item.size}</div>` : ""}
         <div class="cart-meta">
-          <span class="cart-seller">${item.seller || "STORY Partner"}</span>
+          <span class="cart-seller">${item.seller || "ZERA Partner"}</span>
           <span class="cart-shipping">${item.shipping || "Free shipping"}</span>
         </div>
         ${item.extra ? `<div class="cart-extra">${item.extra}</div>` : ""}
@@ -846,7 +996,14 @@ function renderCart() {
 
   if (countEl) {
     countEl.innerText = count;
+    if (count > lastRenderedCartCount) {
+      countEl.classList.remove("bump");
+      // restart animation
+      void countEl.offsetWidth;
+      countEl.classList.add("bump");
+    }
   }
+  lastRenderedCartCount = count;
 }
 
 function changeQty(id, delta) {
@@ -881,7 +1038,7 @@ function renderCheckoutSummary() {
   container.innerHTML = "";
 
   if (cart.length === 0) {
-    container.innerHTML = '<div class="checkout-empty">Your cart is empty. <a href="products.php">Continue shopping</a></div>';
+    container.innerHTML = `<div class="checkout-empty">${uiText("Your cart is empty.", "Sepetiniz boş.")} <a href="${appUrl("products.php")}">${uiText("Continue shopping", "Alışverişe devam et")}</a></div>`;
     const submitBtn = document.getElementById("checkoutSubmit");
     if (submitBtn) submitBtn.disabled = true;
     return;
@@ -905,6 +1062,7 @@ function renderCheckoutSummary() {
       <img class="checkout-summary-item-img" src="${imgUrl}" alt="${name}">
       <div class="checkout-summary-item-info">
         <p class="checkout-summary-item-name">${name}</p>
+        ${(item.size || "") ? `<p class="checkout-summary-item-price-unit">${uiText("Size", "Beden")}: ${item.size}</p>` : ""}
         <div class="checkout-summary-item-meta">
           <span class="checkout-summary-item-price-unit">$${item.price.toFixed(2)} each</span>
           <div class="checkout-summary-item-qty-controls">
@@ -958,6 +1116,9 @@ function initCheckoutPayment() {
   const paymentFields = document.getElementById("paymentFields");
   const paymentRadios = form && form.querySelectorAll('input[name="payment"]');
   const paymentMethods = form && form.querySelectorAll(".payment-method");
+  const cardNumberInput = document.getElementById("card_number");
+  const expiryInput = document.getElementById("expiry");
+  const cvvInput = document.getElementById("cvv");
 
   if (!form || !paymentRadios.length) return;
 
@@ -970,11 +1131,66 @@ function initCheckoutPayment() {
 
   paymentRadios.forEach((r) => r.addEventListener("change", updatePaymentUI));
   updatePaymentUI();
+
+  if (cardNumberInput) {
+    cardNumberInput.addEventListener("input", () => {
+      const digitsOnly = (cardNumberInput.value || "").replace(/\D/g, "").slice(0, 16);
+      cardNumberInput.value = digitsOnly.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+    });
+  }
+
+  if (expiryInput) {
+    expiryInput.addEventListener("input", () => {
+      const digitsOnly = (expiryInput.value || "").replace(/\D/g, "").slice(0, 4);
+      if (digitsOnly.length <= 2) {
+        expiryInput.value = digitsOnly;
+        return;
+      }
+      expiryInput.value = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
+    });
+  }
+
+  if (cvvInput) {
+    cvvInput.addEventListener("input", () => {
+      cvvInput.value = (cvvInput.value || "").replace(/\D/g, "").slice(0, 4);
+    });
+  }
+}
+
+function initCheckoutPhoneField() {
+  const countrySelect = document.getElementById("phone_country");
+  const phoneInput = document.getElementById("phone_number");
+  if (!countrySelect || !phoneInput) return;
+
+  function setPhoneRules() {
+    const selected = countrySelect.options[countrySelect.selectedIndex];
+    const maxDigits = parseInt((selected && selected.dataset && selected.dataset.len) || "10", 10);
+    const safeMaxDigits = Number.isFinite(maxDigits) && maxDigits > 0 ? maxDigits : 10;
+
+    phoneInput.maxLength = safeMaxDigits;
+    phoneInput.placeholder = uiText(
+      `Number (${safeMaxDigits} digits)`,
+      `Numara (${safeMaxDigits} hane)`
+    );
+
+    if ((phoneInput.value || "").length > safeMaxDigits) {
+      phoneInput.value = phoneInput.value.slice(0, safeMaxDigits);
+    }
+  }
+
+  phoneInput.addEventListener("input", () => {
+    phoneInput.value = (phoneInput.value || "")
+      .replace(/\D/g, "")
+      .slice(0, phoneInput.maxLength);
+  });
+
+  countrySelect.addEventListener("change", setPhoneRules);
+  setPhoneRules();
 }
 
 function goToCheckout() {
   if (cart.length === 0) {
-    alert("Cart is empty");
+    alert(uiText("Cart is empty", "Sepet boş"));
     return;
   }
   saveCart();
@@ -983,14 +1199,14 @@ function goToCheckout() {
 
 function checkout() {
   if (cart.length === 0) {
-    alert("Cart is empty");
+    alert(uiText("Cart is empty", "Sepet boş"));
     return;
   }
 
   const btn = document.getElementById("checkoutSubmit");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Processing...";
+    btn.textContent = uiText("Processing...", "İşleniyor...");
   }
 
   fetch(appUrl("checkout.php"), {
@@ -1006,13 +1222,13 @@ function checkout() {
         saveCart();
         window.location.href = "orders.php?order_id=" + data.order_id;
       } else {
-        alert("Checkout failed: " + (data.error || "Unknown error"));
-        if (btn) { btn.disabled = false; btn.textContent = "Complete Purchase"; }
+        alert(uiText("Checkout failed: ", "Ödeme başarısız: ") + (data.error || uiText("Unknown error", "Bilinmeyen hata")));
+        if (btn) { btn.disabled = false; btn.textContent = uiText("Complete Purchase", "Satın Almayı Tamamla"); }
       }
     })
     .catch(() => {
-      alert("Network error. Please try again.");
-      if (btn) { btn.disabled = false; btn.textContent = "Complete Purchase"; }
+      alert(uiText("Network error. Please try again.", "Ağ hatası. Lütfen tekrar deneyin."));
+      if (btn) { btn.disabled = false; btn.textContent = uiText("Complete Purchase", "Satın Almayı Tamamla"); }
     });
 }
 

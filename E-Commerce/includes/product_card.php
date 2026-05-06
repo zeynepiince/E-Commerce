@@ -1,13 +1,17 @@
 <?php
+if (!function_exists("t")) {
+  require_once __DIR__ . "/../functions.php";
+}
 $cartId = isset($product['name']) ? abs(crc32($product['name'])) : (($idx ?? 0) + 1);
 $productId = (int) ($cartId ?: (($idx ?? 0) + 1));
 $imageUrl = !empty($product['image_url']) ? $product['image_url'] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff';
-$productName = $product['name'] ?? 'Product';
+$productName = $product['name'] ?? t("product.card.fallback_name", "Product");
 $productPrice = (float) ($product['price'] ?? 0);
 $productCategory = $product['category'] ?? '';
-$productDesc = $product['description'] ?? $productCategory ? "Premium {$productCategory} from our collection." : "Quality product from STORY.";
-$seller = $product['seller'] ?? 'STORY Partner';
-$shipping = $product['shipping'] ?? 'Free shipping';
+$productDesc = localized_product_description($product);
+$sizeList = get_product_sizes($product);
+$seller = $product['seller'] ?? t("product.card.seller", "ZERA Partner");
+$shipping = $product['shipping'] ?? t("product.card.shipping", "Free shipping");
 $badgeList = [];
 if (isset($badges) && is_array($badges)) {
   $badgeList = $badges;
@@ -17,7 +21,7 @@ if (isset($badges) && is_array($badges)) {
 ?>
 <div class="product-card">
   <button type="button" class="product-card-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>">♡</button>
-  <a href="product_detail.php?name=<?= urlencode($productName) ?>" class="product-card-link">
+  <a href="<?= htmlspecialchars(localized_path('product_detail.php', ['name' => $productName]), ENT_QUOTES, 'UTF-8') ?>" class="product-card-link">
     <?php if (!empty($badgeList)): ?>
       <div class="product-card-badges">
         <?php foreach ($badgeList as $b): ?>
@@ -33,13 +37,16 @@ if (isset($badges) && is_array($badges)) {
       <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1542291026-7eec264c27ff';this.onerror=null;">
     </div>
     <div class="product-card-overlay">
-      <span class="product-card-quickview">View Details</span>
+      <span class="product-card-quickview"><?= htmlspecialchars(t("product.card.view_details", "View Details"), ENT_QUOTES, 'UTF-8') ?></span>
     </div>
   </a>
-  <div class="product-card-body">
-    <a href="product_detail.php?name=<?= urlencode($productName) ?>" class="product-card-name"><?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?></a>
+  <div class="product-card-body" data-size-host="1">
+    <a href="<?= htmlspecialchars(localized_path('product_detail.php', ['name' => $productName]), ENT_QUOTES, 'UTF-8') ?>" class="product-card-name"><?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?></a>
     <p class="product-card-desc"><?= htmlspecialchars($productDesc, ENT_QUOTES, 'UTF-8') ?></p>
     <p class="product-card-price">$<?= number_format($productPrice, 2) ?></p>
+    <?php if (!empty($sizeList)): ?>
+      <p class="product-card-meta"><?= htmlspecialchars(t("product.card.size", "Size"), ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars(implode(" · ", $sizeList), ENT_QUOTES, 'UTF-8') ?></p>
+    <?php endif; ?>
     <p class="product-card-meta"><?= htmlspecialchars($seller, ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($shipping, ENT_QUOTES, 'UTF-8') ?></p>
     <button 
       type="button"
@@ -50,7 +57,7 @@ if (isset($badges) && is_array($badges)) {
       <?= $productPrice ?>,
       <?= json_encode($imageUrl) ?>
       )'>
-      Add to Cart
+      <?= htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') ?>
     </button>
 
   </div>
