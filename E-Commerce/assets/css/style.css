@@ -1361,6 +1361,13 @@ body.cart-open .chat-toggle{
   cursor:pointer;
 }
 
+.btn-full-width:disabled {
+  background: #d1d5db !important;
+  color: #6b7280 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
 /* FILTER BAR */
 .filter-bar{
   display:flex;
