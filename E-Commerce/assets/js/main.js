@@ -107,7 +107,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const image = btn.dataset.image || "";
     const parsed = parseFloat(btn.dataset.price || "");
     const price = Number.isFinite(parsed) ? parsed : null;
-    if (id) toggleFavorite(id, name, image, price);
+    const stockQuantity = parseInt(btn.dataset.stock || "0", 10);
+    if (id) toggleFavorite(id, name, image, price, stockQuantity);
   });
 
 });
@@ -273,6 +274,7 @@ function loadFavorites() {
         name: f.name,
         imageUrl: f.imageUrl || null,
         price: Number.isFinite(Number(f.price)) ? Number(f.price) : null,
+        stockQuantity: Number.isFinite(Number(f.stockQuantity)) ? Number(f.stockQuantity) : 1,
         seller: f.seller || "ZERA Partner",
         shipping: f.shipping || "Free shipping",
         qty: typeof f.qty === "number" ? f.qty : 1,
@@ -314,6 +316,7 @@ function addRecentlyViewed(item) {
     name: item.name || "Product",
     imageUrl: item.imageUrl || null,
     price: typeof item.price === "number" ? item.price : null,
+    stockQuantity: typeof item.stockQuantity === "number" ? item.stockQuantity : 1
   });
   if (recentlyViewed.length > 12) {
     recentlyViewed = recentlyViewed.slice(0, 12);
@@ -339,6 +342,9 @@ function renderRecentlyViewed() {
     const safeImage = p.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
     const priceDisplay = typeof p.price === "number" ? `$${p.price}` : "";
     const id = p.id;
+    const stockQuantity =
+      typeof p.stockQuantity === "number" ? p.stockQuantity : 1;
+    const inStock = stockQuantity > 0;
     const card = document.createElement("div");
     card.className = "card featured-card";
     card.innerHTML = `
@@ -353,8 +359,16 @@ function renderRecentlyViewed() {
       <img src="${safeImage}" alt="${p.name || "Product"}">
       <h4>${p.name || "Product"}</h4>
       ${priceDisplay ? `<p class="price">${priceDisplay}</p>` : ""}
-      <button onclick="addToCart(${id}, '${(p.name || "").replace(/'/g, "\\'")}', ${p.price || 0}, '${safeImage}')">
-        Add to Cart
+      <button
+        ${inStock ? "" : "disabled"}
+        class="${inStock ? "" : "product-card-add--disabled"}"
+        onclick="${
+          inStock
+            ? `addToCart(${id}, '${(p.name || "").replace(/'/g, "\\'")}', ${p.price || 0}, '${safeImage}')`
+            : "return false;"
+        }"
+      >
+        ${inStock ? "Add to Cart" : "Out of Stock"}
       </button>
     `;
     row.appendChild(card);
@@ -467,7 +481,7 @@ function hydrateFavoritePricesFromServer() {
     .catch(() => {});
 }
 
-function toggleFavorite(id, name, imageUrl, price = null) {
+function toggleFavorite(id, name, imageUrl, price = null, stockQuantity = 1) {
   if (isFavorite(id)) {
     favorites = favorites.filter(f => f.id !== id);
   } else {
@@ -479,6 +493,7 @@ function toggleFavorite(id, name, imageUrl, price = null) {
       name,
       imageUrl: imageUrl || null,
       price: typeof finalPrice === "number" ? finalPrice : 0,
+      stockQuantity: typeof stockQuantity === "number" ? stockQuantity : 1,
       seller: "ZERA Partner",
       shipping: "Free shipping",
       qty: 1,
@@ -504,7 +519,7 @@ function renderWishlist() {
 
   if (countEl) {
     countEl.textContent = favorites.length
-      ? ` (${favorites.length} ${uiText("items", "ürün")})`
+      ? ` (${favorites.length} ${favorites.length === 1 ? "item" : "items"})`
       : "";
   }
 
@@ -514,9 +529,9 @@ function renderWishlist() {
     container.innerHTML = `
       <div class="wishlist-empty">
         <div class="wishlist-empty-icon">♡</div>
-        <h2 class="wishlist-empty-title">${uiText("Your wishlist is empty", "Favorileriniz boş")}</h2>
-        <p class="wishlist-empty-text">${uiText("Save items you like by clicking the heart icon on product cards.", "Beğendiğiniz ürünleri kalp ikonuna tıklayarak kaydedin.")}</p>
-        <a href="products.php" class="wishlist-empty-btn">${uiText("Explore Products", "Ürünleri Keşfet")}</a>
+        <h2 class="wishlist-empty-title">Your wishlist is empty</h2>
+        <p class="wishlist-empty-text">Save items you like by clicking the heart icon on product cards.</p>
+        <a href="products.php" class="wishlist-empty-btn">Explore Products</a>
       </div>
     `;
     return;
@@ -526,26 +541,48 @@ function renderWishlist() {
   grid.className = "wishlist-grid";
 
   favorites.forEach(f => {
-    const safeImage = (f.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff").replace(/'/g, "\\'");
-    const safeName = (f.name || "Product").replace(/'/g, "\\'");
-    const priceDisplay = typeof f.price === "number" ? f.price : 0;
+    const image = f.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
+    const name = f.name || "Product";
+    const price = Number.isFinite(Number(f.price)) ? Number(f.price) : 0;
+    const stockQuantity = Number.isFinite(Number(f.stockQuantity)) ? Number(f.stockQuantity) : 1;
+    const inStock = stockQuantity > 0;
+
     const card = document.createElement("div");
     card.className = "wishlist-card";
+
     card.innerHTML = `
-      <a href="product_detail.php?name=${encodeURIComponent(f.name || "Product")}" class="wishlist-card-image-wrap">
-        <img src="${safeImage}" alt="${safeName}" loading="lazy">
+      <a href="product_detail.php?name=${encodeURIComponent(name)}" class="wishlist-card-image-wrap">
+        <img src="${image}" alt="${name}" loading="lazy">
         <span class="wishlist-card-badge">Saved</span>
       </a>
+
       <div class="wishlist-card-body">
-        <a href="product_detail.php?name=${encodeURIComponent(f.name || "Product")}" class="wishlist-card-name">${safeName}</a>
-        <p class="wishlist-card-price">$${priceDisplay.toFixed(2)}</p>
+        <a href="product_detail.php?name=${encodeURIComponent(name)}" class="wishlist-card-name">${name}</a>
+        <p class="wishlist-card-price">$${price.toFixed(2)}</p>
         <p class="wishlist-card-meta">${f.seller || "ZERA Partner"} · ${f.shipping || "Free shipping"}</p>
+
         <div class="wishlist-card-actions">
-          <button type="button" class="wishlist-card-add" onclick="addFavoriteToCart(${f.id})">Add to Cart</button>
-          <button type="button" class="wishlist-card-remove" onclick="wishlistRemove(${f.id})">Remove from Wishlist</button>
+          <button type="button" class="wishlist-card-add ${inStock ? "" : "wishlist-card-add--disabled"}" ${inStock ? "" : "disabled"}>
+            ${inStock ? "Add to Cart" : "Out of Stock"}
+          </button>
+
+          <button type="button" class="wishlist-card-remove">
+            Remove from Wishlist
+          </button>
         </div>
       </div>
     `;
+
+    const addBtn = card.querySelector(".wishlist-card-add");
+    if (addBtn && inStock) {
+      addBtn.addEventListener("click", () => addFavoriteToCart(f.id));
+    }
+
+    const removeBtn = card.querySelector(".wishlist-card-remove");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", () => wishlistRemove(f.id));
+    }
+
     grid.appendChild(card);
   });
 
@@ -570,6 +607,12 @@ function renderWishlistPreview() {
   preview.forEach(f => {
     const safeImage = f.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
     const card = document.createElement("div");
+    const stockQuantity =
+    Number.isFinite(Number(f.stockQuantity))
+    ? Number(f.stockQuantity)
+    : 1;
+
+    const inStock = stockQuantity > 0;
     card.className = "card featured-card";
     card.innerHTML = `
       <button
@@ -583,11 +626,12 @@ function renderWishlistPreview() {
       <img src="${safeImage}" alt="${f.name || "Product"}">
       <h4>${f.name || "Product"}</h4>
       <button
-        class="btn-full-width"
+        class="btn-full-width ${inStock ? "" : "product-card-add--disabled"}"
         style="margin-top:8px;"
-        onclick="addFavoriteToCart(${f.id})"
+        ${inStock ? "" : "disabled"}
+        onclick="${inStock ? `addFavoriteToCart(${f.id})` : "return false;"}"
       >
-        Add to Cart
+        ${inStock ? "Add to Cart" : "Out of Stock"}
       </button>
     `;
     grid.appendChild(card);
