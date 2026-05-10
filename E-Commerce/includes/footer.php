@@ -214,6 +214,8 @@ window.APP_LANG = <?= json_encode($appLang) ?>;
 <?php if (isset($is_homepage) && $is_homepage): ?>
 <script src="assets/js/homepage.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/homepage.js')) ?>"></script>
 <?php endif; ?>
+
+<script src="assets/js/main.js"></script>
 </body>
 </html>
 

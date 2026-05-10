@@ -65,9 +65,18 @@ $loggedInName = $_SESSION['user_name'] ?? null;
     </nav>
 
     <form action="<?= htmlspecialchars(localized_path('products.php'), ENT_QUOTES, 'UTF-8') ?>" method="get" class="nav-search-form">
-      <input type="text" name="q" class="nav-search" placeholder="<?= htmlspecialchars(t("nav.search_placeholder", "Search products..."), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
-    </form>
+      <span class="nav-search-icon">⌕</span>
 
+      <input 
+        type="text" 
+        name="q" 
+        class="nav-search" 
+        placeholder="<?= htmlspecialchars(t("nav.search_placeholder", "Search products..."), ENT_QUOTES, 'UTF-8') ?>" 
+        value="<?= htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+      >
+
+      <button type="submit" class="nav-search-submit" aria-label="Search"> → </button>
+    </form>
   </div>
 
   <div class="header-right">
