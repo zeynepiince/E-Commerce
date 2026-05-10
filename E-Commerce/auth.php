@@ -108,7 +108,7 @@ $page_title = 'Sign In | ZERA – Smart Online Store';
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8') ?></title>
-  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="auth.css?v=1">
 </head>
 <body>
   <div class="auth-split">
@@ -125,6 +125,9 @@ $page_title = 'Sign In | ZERA – Smart Online Store';
     <div class="auth-form-section">
       <div class="auth-form-wrapper">
         <div class="auth-card">
+            <a href="index.php" class="auth-back-link">
+              ← Back to Home
+            </a>
           <div class="auth-header">
             <h2 class="auth-card-title">Welcome back</h2>
             <p class="auth-card-subtitle">Sign in or create an account</p>

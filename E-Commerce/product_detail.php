@@ -7,7 +7,15 @@ $product   = null;
 
 if ($productName) {
     $stmt = $pdo->prepare("
-      SELECT p.name, p.price, p.image_url, COALESCE(c.category_name, '') AS category
+    SELECT
+      p.product_id,
+      p.name,
+      p.price,
+      p.image_url,
+      p.description,
+      p.stock_quantity,
+      p.sub_category,
+      COALESCE(c.category_name, '') AS category
       FROM products p
       LEFT JOIN categories c ON c.category_id = p.category_id
       WHERE p.name = ?
@@ -17,10 +25,15 @@ if ($productName) {
 
     if ($dbProduct) {
         $product = [
+            'product_id' => $dbProduct['product_id'],
             'name' => $dbProduct['name'],
             'price' => $dbProduct['price'],
             'image_url' => $dbProduct['image_url'],
-            'likes' => rand(10, 100) // placeholder beğeni sayısı
+            'description' => $dbProduct['description'],
+            'stock_quantity' => $dbProduct['stock_quantity'],
+            'category' => $dbProduct['category'],
+            'sub_category' => $dbProduct['sub_category'],
+            'likes' => rand(10, 100)
         ];
     }
 }
@@ -32,7 +45,10 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
 
 <section class="products">
   <?php if ($product): ?>
-    <?php $cartId = crc32($product['name']); ?>
+    <?php 
+      $cartId = (int) ($product['product_id'] ?? 0);
+      $inStock = ((int)($product['stock_quantity'] ?? 0) > 0);
+    ?>
     <div class="product-detail">
       <div class="product-detail-image" style="position:relative;">
         <button
@@ -78,8 +94,10 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
             <span class="meta-value"><?= htmlspecialchars(t("product_detail.shipping_value", "Free shipping · 2–4 business days"), ENT_QUOTES, 'UTF-8') ?></span>
           </div>
           <div class="product-detail-meta-row">
-            <span class="meta-label"><?= htmlspecialchars(t("product_detail.stock", "Stock"), ENT_QUOTES, 'UTF-8') ?></span>
-            <span class="meta-value"><?= htmlspecialchars(t("product_detail.stock_value", "In stock"), ENT_QUOTES, 'UTF-8') ?></span>
+              <span class="meta-label"><?= htmlspecialchars(t("product_detail.stock", "Stock"), ENT_QUOTES, 'UTF-8') ?></span>
+              <span class="meta-value">
+                <?= $inStock ? 'In stock' : 'Out of stock' ?>
+              </span>
           </div>
           <?php $sizeList = get_product_sizes($product); ?>
           <?php if (!empty($sizeList)): ?>
@@ -98,15 +116,16 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
         <button
           class="btn-full-width"
           style="max-width:260px;"
-          onclick="addToCartWithSelectedSize(
+          <?= !$inStock ? 'disabled' : '' ?>
+          onclick="<?= $inStock ? "addToCartWithSelectedSize(
             this,
-            <?= (int) $cartId ?>,
-            '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
-            <?= (float) $product['price'] ?>,
-            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>'
-          )"
+            " . (int)$cartId . ",
+            " . htmlspecialchars(json_encode($product['name']), ENT_QUOTES, 'UTF-8') . ",
+            " . (float)$product['price'] . ",
+            " . htmlspecialchars(json_encode($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff'), ENT_QUOTES, 'UTF-8') . "
+          )" : "return false;" ?>"
         >
-          <?= htmlspecialchars(t("product_detail.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') ?>
+           <?= $inStock ? htmlspecialchars(t("product_detail.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') : 'Out of Stock' ?>
         </button>
         </div>
       </div>
@@ -120,18 +139,22 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
 </section>
 
 <?php if ($product): ?>
-  <script>
-    window.addEventListener("DOMContentLoaded", function () {
-      if (typeof addRecentlyViewed === "function") {
-        addRecentlyViewed({
-          id: <?= (int) $cartId ?>,
-          name: "<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>",
-          imageUrl: "<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>",
-          price: <?= (float) $product['price'] ?>
-        });
-      }
-    });
-  </script>
+<?php $recentId = (int)($cartId ?? 0); ?>
+<script>
+  window.addEventListener("load", function () {
+    if (typeof addRecentlyViewed === "function") {
+      addRecentlyViewed({
+        id: <?= $recentId ?>,
+        name: <?= json_encode($product['name']) ?>,
+        imageUrl: <?= json_encode($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff') ?>,
+        price: <?= (float) $product['price'] ?>,
+        stockQuantity: <?= (int) ($product['stock_quantity'] ?? 0) ?>
+      });
+    } else {
+      console.log("addRecentlyViewed function not found");
+    }
+  });
+</script>
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>

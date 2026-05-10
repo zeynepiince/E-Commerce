@@ -80,30 +80,48 @@ function get_featured_products(PDO $pdo): array
 {
     try {
         $stmt = $pdo->query(
-            "SELECT p.`name`, p.`price`, p.`image_url`, COALESCE(c.category_name, '') AS `category`, p.`badges`
+            "SELECT 
+                p.product_id,
+                p.name,
+                p.price,
+                p.image_url,
+                p.description,
+                p.stock_quantity,
+                p.badges,
+                COALESCE(c.category_name, '') AS category
              FROM products p
              LEFT JOIN categories c ON c.category_id = p.category_id
              WHERE p.is_featured = 1
              LIMIT 8"
         );
+
         $rows = $stmt->fetchAll();
         if (!empty($rows)) return $rows;
     } catch (PDOException $e) {}
+
     return get_random_products($pdo, 8);
 }
-
 /**
  * Farklı bölümler için rastgele ürünler döndürür.
  */
 function get_random_products(PDO $pdo, int $limit = 4): array
 {
     $stmt = $pdo->prepare(
-        "SELECT p.`name`, p.`price`, p.`image_url`, COALESCE(c.category_name, '') AS `category`, p.`badges`
+        "SELECT 
+            p.product_id,
+            p.name,
+            p.price,
+            p.image_url,
+            p.description,
+            p.stock_quantity,
+            p.badges,
+            COALESCE(c.category_name, '') AS category
          FROM products p
          LEFT JOIN categories c ON c.category_id = p.category_id
          ORDER BY RAND()
          LIMIT ?"
     );
+
     $stmt->bindValue(1, $limit, PDO::PARAM_INT);
     $stmt->execute();
 

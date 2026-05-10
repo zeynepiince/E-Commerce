@@ -15,6 +15,8 @@ if (!empty($_SESSION['user_id'])) {
             p.price,
             p.image_url,
             p.badges,
+            p.stock_quantity,
+            p.sub_category,
             c.category_name AS category
         FROM user_favorites uf
         JOIN products p ON uf.product_id = p.product_id

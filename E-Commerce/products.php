@@ -2,6 +2,7 @@
 require_once 'functions.php';
 
 $selectedCategory = $_GET['category'] ?? '';
+$selectedSubCategory = $_GET['sub_category'] ?? '';
 $minPrice = $_GET['min_price'] ?? '';
 $maxPrice = $_GET['max_price'] ?? '';
 $sort = $_GET['sort'] ?? 'popular';
@@ -33,6 +34,7 @@ $sql = "
         p.badges,
         p.description,
         p.stock_quantity,
+        p.sub_category,
         c.category_name AS category
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.category_id
@@ -43,6 +45,10 @@ $params = [];
 if ($selectedCategory !== '') {
     $sql .= " AND LOWER(c.category_name) = LOWER(?)";
     $params[] = $selectedCategory;
+}
+if ($selectedSubCategory !== '') {
+    $sql .= " AND LOWER(p.sub_category) = LOWER(?)";
+    $params[] = $selectedSubCategory;
 }
 
 if ($minPrice !== '' && is_numeric($minPrice)) {
@@ -150,13 +156,24 @@ $page_title = t("meta.products_title", "ZERA - Products");
 <div class="products-page">
   <header class="products-header">
     <h1 class="products-title">
-      <?= $selectedCategory ? htmlspecialchars(localized_category_label($selectedCategory), ENT_QUOTES, 'UTF-8') : htmlspecialchars(t("products.title", "Our Products"), ENT_QUOTES, 'UTF-8') ?>
+      <?php if ($selectedSubCategory): ?>
+        <?= htmlspecialchars(localized_category_label($selectedSubCategory), ENT_QUOTES, 'UTF-8') ?>
+      <?php elseif ($selectedCategory): ?>
+        <?= htmlspecialchars(localized_category_label($selectedCategory), ENT_QUOTES, 'UTF-8') ?>
+      <?php else: ?>
+        <?= htmlspecialchars(t("products.title", "Our Products"), ENT_QUOTES, 'UTF-8') ?>
+      <?php endif; ?>
     </h1>
     <p class="products-subtitle">
-      <?php if ($selectedCategory): ?>
-        <?= htmlspecialchars(t("products.browse_prefix", "Browse"), ENT_QUOTES, 'UTF-8') ?> <strong><?= htmlspecialchars(localized_category_label($selectedCategory), ENT_QUOTES, 'UTF-8') ?></strong> <?= htmlspecialchars(t("products.browse_suffix", "from our collection."), ENT_QUOTES, 'UTF-8') ?>
-      <?php else: ?>
-        <?= htmlspecialchars(t("products.subtitle", "Discover our"), ENT_QUOTES, 'UTF-8') ?> <strong><?= htmlspecialchars(t("products.subtitle_emphasis", "curated"), ENT_QUOTES, 'UTF-8') ?></strong> <?= htmlspecialchars(t("products.subtitle_suffix", "collection of fashion, tech, and lifestyle essentials."), ENT_QUOTES, 'UTF-8') ?>
+      <?php if ($selectedCategory || $selectedSubCategory): ?>
+         <?php $currentLabel = $selectedSubCategory ?: $selectedCategory; ?>
+
+         Explore our <strong> <?= htmlspecialchars(localized_category_label($currentLabel), ENT_QUOTES, 'UTF-8') ?> </strong> collection.
+        
+        <?php else: ?>
+          <?= htmlspecialchars(t("products.subtitle", "Discover our"), ENT_QUOTES, 'UTF-8') ?>
+          <strong> <?= htmlspecialchars(t("products.subtitle_emphasis", "curated"), ENT_QUOTES, 'UTF-8') ?> </strong>
+          <?= htmlspecialchars(t("products.subtitle_suffix", "collection of fashion, tech, and lifestyle essentials."), ENT_QUOTES, 'UTF-8') ?>
       <?php endif; ?>
     </p>
   </header>
