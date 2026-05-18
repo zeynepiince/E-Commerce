@@ -53,7 +53,24 @@ function build_product_reply(array $products, array $entities, string $lang = "e
             : "I couldn't find matches. Try adding a budget or product type (for example: running shoes under 120).";
     }
     $lines = [];
-    foreach ($products as $p) $lines[] = "- {$p["name"]} ($" . number_format((float) $p["price"], 2) . ")";
+
+    foreach ($products as $p) {
+        $name = $p["name"] ?? "Product";
+        $price = number_format((float) ($p["price"] ?? 0), 2);
+        $stock = (int) ($p["stock_quantity"] ?? 0);
+
+        if ($stock <= 0) {
+            continue;
+        }
+
+        $lines[] = "- {$name} (${$price})";
+    }
+
+    if (empty($lines)) {
+        return $lang === "tr"
+            ? "Şu anda stokta uygun ürün bulamadım. Farklı bir kategori veya bütçe deneyebilirsin."
+            : "I couldn't find suitable in-stock products right now. Try another category or budget.";
+    }
     return $lang === "tr" ? "Sana uygun olabilecek seçenekler:\n" . implode("\n", $lines) : "Here are some good options for you:\n" . implode("\n", $lines);
 }
 

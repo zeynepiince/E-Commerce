@@ -2,82 +2,206 @@
 
 function search_products_advanced(PDO $pdo, array $entities, int $limit = 4, int $relaxLevel = 0): array
 {
-    $sql = "SELECT p.product_id, p.name, p.price, p.image_url, COALESCE(c.category_name, '') AS category
-            FROM products p
-            LEFT JOIN categories c ON c.category_id = p.category_id
-            WHERE 1=1";
+    $sql = "
+        SELECT 
+            p.product_id,
+            p.name,
+            p.price,
+            p.image_url,
+            p.description,
+            p.sub_category,
+            p.stock_quantity,
+            COALESCE(c.category_name, '') AS category
+        FROM products p
+        LEFT JOIN categories c ON c.category_id = p.category_id
+        WHERE 1=1
+          AND COALESCE(p.stock_quantity, 0) > 0
+    ";
+
     $params = [];
-    if (is_numeric($entities["max_price"])) { $sql .= " AND p.price <= ?"; $params[] = (float) $entities["max_price"]; }
-    if (is_numeric($entities["min_price"])) { $sql .= " AND p.price >= ?"; $params[] = (float) $entities["min_price"]; }
-    if (!empty($entities["category_like"])) {
-        $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(c.category_name) LIKE ?)";
-        $like = "%" . strtolower((string) $entities["category_like"]) . "%";
-        $params[] = $like; $params[] = $like;
+
+    if (isset($entities["max_price"]) && is_numeric($entities["max_price"])) {
+        $sql .= " AND p.price <= ?";
+        $params[] = (float) $entities["max_price"];
     }
-    if (!empty($entities["keywords"])) {
+
+    if (isset($entities["min_price"]) && is_numeric($entities["min_price"])) {
+        $sql .= " AND p.price >= ?";
+        $params[] = (float) $entities["min_price"];
+    }
+
+    if (!empty($entities["category_like"])) {
+        $sql .= " AND (
+            LOWER(p.name) LIKE ?
+            OR LOWER(c.category_name) LIKE ?
+            OR LOWER(p.sub_category) LIKE ?
+        )";
+        $like = "%" . strtolower((string) $entities["category_like"]) . "%";
+        $params[] = $like;
+        $params[] = $like;
+        $params[] = $like;
+    }
+
+    if (!empty($entities["keywords"]) && is_array($entities["keywords"])) {
         $orParts = [];
+
         foreach (array_slice($entities["keywords"], 0, 6) as $kw) {
             $orParts[] = "LOWER(p.name) LIKE ?";
             $orParts[] = "LOWER(c.category_name) LIKE ?";
+            $orParts[] = "LOWER(p.sub_category) LIKE ?";
+
             $like = "%" . to_lower((string) $kw) . "%";
-            $params[] = $like; $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
         }
-        if (!empty($orParts)) $sql .= " AND (" . implode(" OR ", $orParts) . ")";
+
+        if (!empty($orParts)) {
+            $sql .= " AND (" . implode(" OR ", $orParts) . ")";
+        }
     }
+
     if (!empty($entities["product_type"])) {
-        $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(c.category_name) LIKE ?)";
+        $sql .= " AND (
+            LOWER(p.name) LIKE ?
+            OR LOWER(c.category_name) LIKE ?
+            OR LOWER(p.sub_category) LIKE ?
+        )";
         $like = "%" . to_lower((string) $entities["product_type"]) . "%";
         $params[] = $like;
         $params[] = $like;
+        $params[] = $like;
     }
+
     if (($entities["audience"] ?? null) === "men") {
-        $sql .= " AND (LOWER(c.category_name) LIKE ? OR LOWER(p.name) LIKE ?)
-                  AND LOWER(p.name) NOT LIKE ?
-                  AND LOWER(c.category_name) NOT LIKE ?";
+        $sql .= " AND (
+            LOWER(c.category_name) LIKE ?
+            OR LOWER(p.name) LIKE ?
+            OR LOWER(p.sub_category) LIKE ?
+        )
+        AND LOWER(p.name) NOT LIKE ?
+        AND LOWER(c.category_name) NOT LIKE ?
+        AND LOWER(p.sub_category) NOT LIKE ?";
+
         $params[] = "%men%";
         $params[] = "%men%";
+        $params[] = "%men%";
+        $params[] = "%women%";
         $params[] = "%women%";
         $params[] = "%women%";
     } elseif (($entities["audience"] ?? null) === "women") {
-        $sql .= " AND (LOWER(c.category_name) LIKE ? OR LOWER(p.name) LIKE ?)
-                  AND LOWER(p.name) NOT LIKE ?
-                  AND LOWER(c.category_name) NOT LIKE ?";
+        $sql .= " AND (
+            LOWER(c.category_name) LIKE ?
+            OR LOWER(p.name) LIKE ?
+            OR LOWER(p.sub_category) LIKE ?
+        )
+        AND LOWER(p.name) NOT LIKE ?
+        AND LOWER(c.category_name) NOT LIKE ?
+        AND LOWER(p.sub_category) NOT LIKE ?";
+
         $params[] = "%women%";
         $params[] = "%women%";
+        $params[] = "%women%";
+        $params[] = "%men%";
         $params[] = "%men%";
         $params[] = "%men%";
     }
+
     if (!empty($entities["features"]) && is_array($entities["features"])) {
         foreach (array_slice($entities["features"], 0, 4) as $feature) {
             if ($feature === "noise_cancelling") {
-                $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(p.name) LIKE ? OR LOWER(p.name) LIKE ?)";
+                $sql .= " AND (
+                    LOWER(p.name) LIKE ?
+                    OR LOWER(p.name) LIKE ?
+                    OR LOWER(p.name) LIKE ?
+                    OR LOWER(p.description) LIKE ?
+                )";
+
                 $params[] = "%noise%";
                 $params[] = "%cancel%";
                 $params[] = "%anc%";
+                $params[] = "%noise%";
                 continue;
             }
-            $sql .= " AND LOWER(p.name) LIKE ?";
-            $params[] = "%" . to_lower((string) $feature) . "%";
+
+            $like = "%" . to_lower((string) $feature) . "%";
+            $sql .= " AND (
+                LOWER(p.name) LIKE ?
+                OR LOWER(p.description) LIKE ?
+                OR LOWER(p.sub_category) LIKE ?
+            )";
+
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
         }
     }
-    if (!empty($entities["color"])) { $sql .= " AND LOWER(p.name) LIKE ?"; $params[] = "%" . strtolower((string) $entities["color"]) . "%"; }
-    if (!empty($entities["size"])) { $sql .= " AND LOWER(p.name) LIKE ?"; $params[] = "%" . strtolower((string) $entities["size"]) . "%"; }
-    if (!empty($entities["brand"])) { $sql .= " AND LOWER(p.name) LIKE ?"; $params[] = "%" . strtolower((string) $entities["brand"]) . "%"; }
+
+    if (!empty($entities["color"])) {
+        $like = "%" . strtolower((string) $entities["color"]) . "%";
+        $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)";
+        $params[] = $like;
+        $params[] = $like;
+    }
+
+    if (!empty($entities["size"])) {
+        $like = "%" . strtolower((string) $entities["size"]) . "%";
+        $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)";
+        $params[] = $like;
+        $params[] = $like;
+    }
+
+    if (!empty($entities["brand"])) {
+        $like = "%" . strtolower((string) $entities["brand"]) . "%";
+        $sql .= " AND (LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)";
+        $params[] = $like;
+        $params[] = $like;
+    }
+
     $sortBy = $entities["sort_by"] ?? "featured_price";
-    if ($sortBy === "price_asc") $sql .= " ORDER BY p.price ASC";
-    elseif ($sortBy === "price_desc") $sql .= " ORDER BY p.price DESC";
-    elseif ($sortBy === "newest") $sql .= " ORDER BY p.product_id DESC";
-    else $sql .= " ORDER BY p.is_featured DESC, p.price ASC";
+
+    if ($sortBy === "price_asc") {
+        $sql .= " ORDER BY p.price ASC";
+    } elseif ($sortBy === "price_desc") {
+        $sql .= " ORDER BY p.price DESC";
+    } elseif ($sortBy === "newest") {
+        $sql .= " ORDER BY p.product_id DESC";
+    } else {
+        $sql .= " ORDER BY p.is_featured DESC, p.price ASC";
+    }
+
     $sql .= " LIMIT " . (int) $limit;
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if (!empty($rows)) return $rows;
-        if ($relaxLevel === 0) { $r = $entities; $r["color"] = null; $r["size"] = null; $r["brand"] = null; return search_products_advanced($pdo, $r, $limit, 1); }
-        if ($relaxLevel === 1) { $r = $entities; $r["keywords"] = []; return search_products_advanced($pdo, $r, $limit, 2); }
-        if ($relaxLevel === 2) { $r = $entities; $r["category_like"] = null; return search_products_advanced($pdo, $r, $limit, 3); }
+
+        if (!empty($rows)) {
+            return $rows;
+        }
+
+        if ($relaxLevel === 0) {
+            $r = $entities;
+            $r["color"] = null;
+            $r["size"] = null;
+            $r["brand"] = null;
+            return search_products_advanced($pdo, $r, $limit, 1);
+        }
+
+        if ($relaxLevel === 1) {
+            $r = $entities;
+            $r["keywords"] = [];
+            return search_products_advanced($pdo, $r, $limit, 2);
+        }
+
+        if ($relaxLevel === 2) {
+            $r = $entities;
+            $r["category_like"] = null;
+            return search_products_advanced($pdo, $r, $limit, 3);
+        }
+
         return [];
     } catch (Throwable $e) {
         return [];
@@ -152,9 +276,26 @@ function try_budget_recommendation(PDO $pdo, string $rawMessage): ?string
 function fetch_top_products(PDO $pdo, int $limit = 6): array
 {
     try {
-        $stmt = $pdo->prepare("SELECT p.name, p.price, COALESCE(c.category_name, '') AS category FROM products p LEFT JOIN categories c ON c.category_id = p.category_id ORDER BY p.is_featured DESC, p.product_id DESC LIMIT ?");
+        $stmt = $pdo->prepare("
+            SELECT 
+                p.product_id,
+                p.name,
+                p.price,
+                p.image_url,
+                p.description,
+                p.sub_category,
+                p.stock_quantity,
+                COALESCE(c.category_name, '') AS category
+            FROM products p
+            LEFT JOIN categories c ON c.category_id = p.category_id
+            WHERE COALESCE(p.stock_quantity, 0) > 0
+            ORDER BY p.is_featured DESC, p.product_id DESC
+            LIMIT ?
+        ");
+
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $e) {
         return [];
