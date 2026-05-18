@@ -53,20 +53,14 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
       <div class="product-detail-image" style="position:relative;">
         <button
           type="button"
-          class="wishlist-btn"
+          class="wishlist-btn product-detail-wishlist"
           data-id="<?= (int) $cartId ?>"
           data-name="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>"
           data-image="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>"
           data-price="<?= htmlspecialchars((string) ((float) $product['price']), ENT_QUOTES, 'UTF-8') ?>"
-          onclick="toggleFavorite(
-            <?= (int) $cartId ?>,
-            '<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>',
-            '<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>',
-            <?= (float) $product['price'] ?>
-          )"
         >
           ♡
-        </button>
+      </button>
         <img 
           src="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>" 
           alt="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>" 
@@ -141,19 +135,50 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
 <?php if ($product): ?>
 <?php $recentId = (int)($cartId ?? 0); ?>
 <script>
-  window.addEventListener("load", function () {
-    if (typeof addRecentlyViewed === "function") {
-      addRecentlyViewed({
-        id: <?= $recentId ?>,
-        name: <?= json_encode($product['name']) ?>,
-        imageUrl: <?= json_encode($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff') ?>,
-        price: <?= (float) $product['price'] ?>,
-        stockQuantity: <?= (int) ($product['stock_quantity'] ?? 0) ?>
-      });
-    } else {
-      console.log("addRecentlyViewed function not found");
+window.addEventListener("load", function () {
+  const favBtn = document.querySelector(".product-detail-wishlist");
+
+  if (favBtn) {
+    const id = Number(favBtn.dataset.id);
+    const name = favBtn.dataset.name || "";
+    const image = favBtn.dataset.image || "";
+    const price = Number(favBtn.dataset.price || 0);
+
+    function refreshHeart() {
+      if (typeof isFavorite === "function" && isFavorite(id)) {
+        favBtn.classList.add("wishlist-btn--active");
+        favBtn.textContent = "♥";
+      } else {
+        favBtn.classList.remove("wishlist-btn--active");
+        favBtn.textContent = "♡";
+      }
     }
-  });
+
+    refreshHeart();
+
+    favBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (typeof toggleFavorite === "function") {
+        toggleFavorite(id, name, image, price);
+        setTimeout(refreshHeart, 80);
+      } else {
+        console.log("toggleFavorite function not found");
+      }
+    });
+  }
+
+  if (typeof addRecentlyViewed === "function") {
+    addRecentlyViewed({
+      id: <?= $recentId ?>,
+      name: <?= json_encode($product['name']) ?>,
+      imageUrl: <?= json_encode($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff') ?>,
+      price: <?= (float) $product['price'] ?>,
+      stockQuantity: <?= (int) ($product['stock_quantity'] ?? 0) ?>
+    });
+  }
+});
 </script>
 <?php endif; ?>
 

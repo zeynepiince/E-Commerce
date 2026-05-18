@@ -68,7 +68,12 @@ if ($searchQuery !== '') {
         foreach (array_slice($tokens, 0, 6) as $t) {
             $orParts[] = "p.name LIKE ?";
             $orParts[] = "c.category_name LIKE ?";
+            $orParts[] = "p.sub_category LIKE ?";
+            $orParts[] = "p.description LIKE ?";
+
             $like = "%" . $t . "%";
+            $params[] = $like;
+            $params[] = $like;
             $params[] = $like;
             $params[] = $like;
         }
@@ -186,7 +191,10 @@ $page_title = t("meta.products_title", "ZERA - Products");
         <select name="category" id="category" class="products-select" onchange="this.form.submit()">
           <option value=""><?= htmlspecialchars(t("products.filter.all_categories", "All categories"), ENT_QUOTES, 'UTF-8') ?></option>
           <?php foreach ($categories as $cat): ?>
-            <option value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>" <?= $selectedCategory === $cat ? 'selected' : '' ?>>
+            <option 
+              value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>" 
+              <?= strtolower($selectedCategory) === strtolower($cat) ? 'selected' : '' ?>
+            >
               <?= htmlspecialchars(localized_category_label($cat), ENT_QUOTES, 'UTF-8') ?>
             </option>
           <?php endforeach; ?>

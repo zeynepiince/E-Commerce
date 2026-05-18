@@ -6,7 +6,6 @@ require_once __DIR__ . "/chatbot/responses.php";
 require_once __DIR__ . "/chatbot/actions.php";
 require_once __DIR__ . "/chatbot/ai.php";
 require_once __DIR__ . "/chatbot/intent.php";
-require_once __DIR__ . "/chatbot/metrics.php";
 require_once __DIR__ . "/i18n.php";
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -153,10 +152,13 @@ $memory["last_cart"] = array_slice($cart, 0, 20);
 $_SESSION["chatbot_memory"] = $memory;
 $_SESSION["user_profile"] = $userProfile;
 
-$experimentMode = get_experiment_mode();
-$experimentBucket = get_experiment_bucket();
-$experimentVariants = get_experiment_variants();
-$experimentBucket = "exp1:" . ($experimentVariants["exp1_guardrail"] ?? "A") . "|exp2:" . ($experimentVariants["exp2_fallback"] ?? "A");
+$experimentMode = "default";
+$experimentBucket = "default";
+$experimentVariants = [
+    "exp1_guardrail" => "A",
+    "exp2_fallback" => "A"
+];
+
 $usedAi = false;
 $guardrailRejected = false;
 [$reply, $suggestedProducts, $redirectUrl, $responseSource] = handle_intent_action($pdo, $intent, $rawMessage, $lang, $policyKnowledge, $entities);
@@ -283,32 +285,14 @@ if (!$user_id) {
 
 if ($user_id) {
     try {
-        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender) VALUES (?, ?, 'user')");
-        $stmt->execute([$user_id, $rawMessage]);
-        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender) VALUES (?, ?, 'bot')");
-        $stmt->execute([$user_id, $reply]);
+        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender, intent) VALUES (?, ?, 'user', ?) ");
+        $stmt->execute([ $user_id, $rawMessage, $intent ]);
+        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender, intent) VALUES (?, ?, 'bot', ?)");
+        $stmt->execute([ $user_id, $reply, $intent ]);
     } catch (Throwable $e) {
         // Support interaction logging should never block metric logging.
     }
 }
-
-try {
-    $latencyMs = (int) round((microtime(true) - $requestStart) * 1000);
-    log_chatbot_metric(
-        $pdo,
-        $user_id ?: null,
-        $intent,
-        $responseSource,
-        $confidence,
-        $latencyMs,
-        $usedAi,
-        $experimentMode,
-        $experimentBucket,
-        $escalatedToHuman,
-        $referenceIntent,
-        $intent
-    );
-} catch (Throwable $e) {}
 
 echo json_encode([
     "reply" => $reply,

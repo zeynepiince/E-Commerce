@@ -32,7 +32,7 @@ if (!empty($_SESSION['user_id'])) {
 
 <?php include 'includes/header.php'; ?>
 
-<link rel="stylesheet" href="assets/css/wishlist.css">
+<link rel="stylesheet" href="assets/css/wishlist.css?v=2">
 
 <div class="wishlist-page">
   <div class="wishlist-container">

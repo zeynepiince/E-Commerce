@@ -1,15 +1,21 @@
 <?php
 require_once 'functions.php';
+require_once 'recommended.php';
 
 $page_title = t("meta.home_title", "ZERA - Home");
 $is_homepage = true;
 
 $featuredProducts   = get_featured_products($pdo);
-$forYouProducts     = get_random_products($pdo, 4);
+
+$userIdForRecommendations = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : 0;
+$forYouProducts = get_ai_recommendations($pdo, $userIdForRecommendations, 4);
+
+
 $bestSellerProducts = get_random_products($pdo, 4);
 $dealProducts       = get_random_products($pdo, 4);
 
 $previouslyBoughtProducts = [];
+$newArrivalProducts = [];
 
 if (!empty($_SESSION['user_id'])) {
     try {
@@ -38,6 +44,32 @@ if (!empty($_SESSION['user_id'])) {
     } catch (Throwable $e) {
         $previouslyBoughtProducts = [];
     }
+}
+
+// new arrivals sorgusu burada
+try {
+    $stmtNewArrivals = $pdo->prepare("
+        SELECT 
+            p.product_id,
+            p.name,
+            p.price,
+            p.image_url,
+            p.badges,
+            p.stock_quantity,
+            p.sub_category,
+            p.description,
+            c.category_name AS category
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE COALESCE(p.stock_quantity, 0) > 0
+        ORDER BY p.product_id DESC
+        LIMIT 4
+    ");
+
+    $stmtNewArrivals->execute();
+    $newArrivalProducts = $stmtNewArrivals->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    $newArrivalProducts = [];
 }
 
 $selectedCategory = $_GET['category'] ?? '';
@@ -179,7 +211,7 @@ $selectedCategory = $_GET['category'] ?? '';
           <p class="hero-subtitle">
             <?= htmlspecialchars(t("home.hero.new_arrivals_sub", "Be the first to discover our latest picks for the season."), ENT_QUOTES, 'UTF-8') ?>
           </p>
-          <a href="#new-arrivals" class="hero-cta">
+          <a href="#new-products" class="hero-cta">
             <?= htmlspecialchars(t("home.shop_now", "Shop Now"), ENT_QUOTES, 'UTF-8') ?>
           </a>
         </div>
@@ -239,20 +271,54 @@ $selectedCategory = $_GET['category'] ?? '';
   </div>
 </section>
 
-<?php if (!empty($previouslyBoughtProducts)): ?>
-<section class="products" id="previously-bought">
-  <h3><?= htmlspecialchars(t("home.previously_bought", "You bought these before"), ENT_QUOTES, 'UTF-8') ?></h3>
-  <p class="subtitle">
-    <?= htmlspecialchars(t("home.previously_bought_sub", "Reorder your past purchases quickly."), ENT_QUOTES, 'UTF-8') ?>
-  </p>
+<section class="products ai-recommendation-section" id="ai-recommended">
+  <div class="ai-section-header">
+    <div>
+      <div class="ai-section-kicker">
+        <span class="ai-spark">✨</span>
+        <span>AI-powered picks</span>
+      </div>
+
+      <h3><?= htmlspecialchars(t("home.recommended_for_you", "Recommended for you"), ENT_QUOTES, 'UTF-8') ?></h3>
+
+      <p class="subtitle">
+        <?= htmlspecialchars(t("home.recommended_for_you_sub", "Personalized suggestions based on your favourites, purchases and browsing behaviour."), ENT_QUOTES, 'UTF-8') ?>
+      </p>
+    </div>
+
+    <span class="ai-badge">AI Recommended</span>
+  </div>
 
   <div class="featured-grid featured-grid--product-cards">
-    <?php foreach ($previouslyBoughtProducts as $idx => $product): ?>
-      <?php $badges = get_product_badges($product, 'recommended', $idx); include 'includes/product_card.php'; ?>
+    <?php foreach ($forYouProducts as $idx => $product): ?>
+      <?php $badges = get_product_badges($product, 'recommended', $idx); ?>
+      <?php include 'includes/product_card.php'; ?>
     <?php endforeach; ?>
   </div>
 </section>
-<?php endif; ?>
+
+<section class="products new-arrivals-section" id="new-products">
+  <div class="section-header-modern">
+    <div>
+      <h3>New arrivals</h3>
+      <p class="subtitle">Fresh products recently added to ZERA.</p>
+    </div>
+
+    <span class="section-pill">Just added</span>
+  </div>
+
+  <div class="featured-grid featured-grid--product-cards">
+    <?php foreach ($newArrivalProducts as $idx => $product): ?>
+      <?php
+        $badges = array_merge(
+          get_product_badges($product, 'new-arrivals', $idx),
+          [['key' => 'new', 'label' => 'New']]
+        );
+        include 'includes/product_card.php';
+      ?>
+    <?php endforeach; ?>
+  </div>
+</section>
 
 <section class="products">
   <h3><?= htmlspecialchars(t("home.best_sellers", "Best sellers"), ENT_QUOTES, 'UTF-8') ?></h3>
@@ -282,7 +348,7 @@ $selectedCategory = $_GET['category'] ?? '';
 <section class="products flash-sale-section" id="flash-sale">
   <div class="flash-sale-header">
     <div>
-      <h3><?= htmlspecialchars(t("home.flash_sale", "Flash sale – limited time"), ENT_QUOTES, 'UTF-8') ?></h3>
+      <h3><?= htmlspecialchars(t("home.flash_sale", "Flash deals"), ENT_QUOTES, 'UTF-8') ?></h3>
       <p class="subtitle">
         <?= htmlspecialchars(t("home.flash_sale_sub", "Deals that end soon. Don’t miss out."), ENT_QUOTES, 'UTF-8') ?>
       </p>
@@ -307,18 +373,20 @@ $selectedCategory = $_GET['category'] ?? '';
   </div>
 </section>
 
-<section class="products" id="on-sale">
-  <h3><?= htmlspecialchars(t("home.on_sale", "On sale"), ENT_QUOTES, 'UTF-8') ?></h3>
+<?php if (!empty($previouslyBoughtProducts)): ?>
+<section class="products" id="previously-bought">
+  <h3><?= htmlspecialchars(t("home.previously_bought", "You bought these before"), ENT_QUOTES, 'UTF-8') ?></h3>
   <p class="subtitle">
-    <?= htmlspecialchars(t("home.on_sale_sub", "Campaign products with special prices."), ENT_QUOTES, 'UTF-8') ?>
+    <?= htmlspecialchars(t("home.previously_bought_sub", "Reorder your past purchases quickly."), ENT_QUOTES, 'UTF-8') ?>
   </p>
 
   <div class="featured-grid featured-grid--product-cards">
-    <?php foreach ($dealProducts as $idx => $product): ?>
-      <?php $badges = get_product_badges($product, 'on-sale', $idx); include 'includes/product_card.php'; ?>
+    <?php foreach ($previouslyBoughtProducts as $idx => $product): ?>
+      <?php $badges = get_product_badges($product, 'recommended', $idx); include 'includes/product_card.php'; ?>
     <?php endforeach; ?>
   </div>
 </section>
+<?php endif; ?>
 
 <section class="products wishlist-preview-section">
   <h3><?= htmlspecialchars(t("home.your_favourites", "Your favourites"), ENT_QUOTES, 'UTF-8') ?></h3>
@@ -333,19 +401,6 @@ $selectedCategory = $_GET['category'] ?? '';
       <?= htmlspecialchars(t("home.view_all_wishlist", "View all wishlist items"), ENT_QUOTES, 'UTF-8') ?> →
     </a>
   </p>
-</section>
-
-<section class="products" id="new-arrivals">
-  <h3><?= htmlspecialchars(t("home.recommended_for_you", "Recommended for you"), ENT_QUOTES, 'UTF-8') ?></h3>
-  <p class="subtitle">
-    <?= htmlspecialchars(t("home.recommended_for_you_sub", "A mix of products picked to match your taste."), ENT_QUOTES, 'UTF-8') ?>
-  </p>
-
-  <div class="featured-grid featured-grid--product-cards">
-    <?php foreach ($forYouProducts as $idx => $product): ?>
-      <?php $badges = get_product_badges($product, 'recommended', $idx); include 'includes/product_card.php'; ?>
-    <?php endforeach; ?>
-  </div>
 </section>
 
 <section class="products" id="recently-viewed">
