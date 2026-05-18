@@ -14,11 +14,22 @@
 }
 
 .logo {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   text-decoration: none;
-  font-size: 23px;
-  font-weight: 800;
-  color: #ff6f00;
-  letter-spacing: 1.8px;
+
+  background: linear-gradient(135deg, #ff6f00, #ffb347);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  transition: all 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+  filter: brightness(1.08);
 }
 
 .header-left {

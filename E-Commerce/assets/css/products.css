@@ -72,6 +72,17 @@
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 
+.products-select,
+.products-select option {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+.products-select option {
+  font-size: 14px;
+  padding: 10px;
+}
+
 .products-input {
   min-width: 100px;
 }
