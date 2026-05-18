@@ -68,7 +68,8 @@
 
     favorites.forEach(function (f) {
       const safeImage = f.imageUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff';
-      const priceDisplay = typeof f.price === 'number' ? '$' + f.price : '';
+      const price = Number(f.price || 0);
+      const priceDisplay = price > 0 ? '$' + price.toFixed(2) : '';
       const card = document.createElement('div');
       card.className = 'profile-wishlist-card';
       card.innerHTML = `
