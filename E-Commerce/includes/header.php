@@ -10,6 +10,7 @@ $metaPrefix = match ($pageFile) {
     "checkout.php" => "checkout",
     "orders.php" => "orders",
     "wishlist.php" => "wishlist",
+    "profile.php" => "profile",
     "product_detail.php" => "product_detail",
     default => "default",
 };
@@ -91,9 +92,9 @@ $loggedInName = $_SESSION['user_name'] ?? null;
     </button>
     <?php if ($loggedInName): ?>
       <a href="<?= htmlspecialchars(localized_path('profile.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action"><?= htmlspecialchars(t("nav.hi", "Hi"), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars($loggedInName, ENT_QUOTES, 'UTF-8') ?></a>
-      <a href="logout.php" class="nav-action"><?= htmlspecialchars(t("nav.logout", "Log out"), ENT_QUOTES, 'UTF-8') ?></a>
+      <a href="<?= htmlspecialchars(localized_path('logout.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action"><?= htmlspecialchars(t("nav.logout", "Log out"), ENT_QUOTES, 'UTF-8') ?></a>
     <?php else: ?>
-      <a href="auth.php" class="nav-action highlight"><?= htmlspecialchars(t("nav.signin_join", "Sign In / Join"), ENT_QUOTES, 'UTF-8') ?></a>
+      <a href="<?= htmlspecialchars(localized_path('auth.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action highlight"><?= htmlspecialchars(t("nav.signin_join", "Sign In / Join"), ENT_QUOTES, 'UTF-8') ?></a>
     <?php endif; ?>
   </div>
 </header>
