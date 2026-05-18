@@ -6,8 +6,8 @@ return [
         "en" => "Shipping usually takes 2-4 business days. During busy periods, delivery may take longer. Orders above certain thresholds may qualify for free shipping.",
     ],
     "returns" => [
-        "tr" => "Çoğu ürün, kullanılmamış ve orijinal ambalajı korunmuşsa 30 gün içinde iade edilebilir. İade onayı sonrası ücret, ödeme yöntemine göre hesaba yansıtılır.",
-        "en" => "Most items can be returned within 30 days if unused and in original condition. After approval, refunds are processed based on the original payment method.",
+        "tr" => "İade işlemini Orders sayfasından ilgili siparişi seçerek başlatabilirsin. Çoğu ürün, kullanılmamış ve orijinal ambalajı korunmuşsa 30 gün içinde iade edilebilir. İade onaylandıktan sonra ücret, ödeme yöntemine göre hesaba yansıtılır.",
+        "en" => "You can start a return from the Orders page by selecting the relevant order. Most items can be returned within 30 days if unused and in original condition. After approval, refunds are processed based on the original payment method.",
     ],
     "payment" => [
         "tr" => "Ödemeler güvenli altyapı üzerinden işlenir. Kredi kartı ve desteklenen diğer ödeme yöntemleri kullanılabilir. Siparişin durumu ödeme onayı sonrası güncellenir.",
