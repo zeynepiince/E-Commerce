@@ -313,15 +313,38 @@ function handle_intent_action(PDO $pdo, string $intent, string $rawMessage, stri
     elseif ($intent === "payment") $reply = build_payment_reply($rawMessage, $policyKnowledge, $lang);
     elseif ($intent === "order_status") $reply = build_order_status_reply($rawMessage, $lang);
     elseif ($intent === "product_search") {
-        $suggestedProducts = search_products_advanced($pdo, $entities, 4);
-        $reply = build_product_reply($suggestedProducts, $entities, $lang);
+
+    $suggestedProducts = search_products_advanced($pdo, $entities, 4);
+
+    // Eğer ürün bulunamazsa featured ürünleri göster
+    if (empty($suggestedProducts)) {
+        $suggestedProducts = fetch_top_products($pdo, 4);
+
+        if ($lang === "tr") {
+            $reply = "Şunlara göz atabilirsin:\n";
+        } else {
+            $reply = "You may like these products:\n";
+        }
+
+        foreach ($suggestedProducts as $p) {
+            $name = $p["name"] ?? "Product";
+            $price = number_format((float)($p["price"] ?? 0), 2);
+
+            $reply .= "- " . $name . " ($" . $price . ")\n";
+        }
+
+        } else {
+
+            $reply = build_product_reply($suggestedProducts, $entities, $lang);
+        }
+
         $redirectUrl = build_products_redirect_url($entities);
         $source = "product_search";
-    } else {
+        } else {
         $budgetReply = try_budget_recommendation($pdo, $rawMessage);
         if (is_string($budgetReply) && $budgetReply !== "") { $reply = $budgetReply; $source = "budget_logic"; }
         else $reply = $lang === "tr" ? "Memnuniyetle yardımcı olurum. Ürün önerisi, kargo, iade veya sipariş takibi sorabilirsin." : "Happy to help. You can ask about product recommendations, shipping, returns, or order tracking.";
+        }
+        return [$reply, $suggestedProducts, $redirectUrl, $source];
     }
-    return [$reply, $suggestedProducts, $redirectUrl, $source];
-}
 

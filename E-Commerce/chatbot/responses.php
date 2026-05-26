@@ -43,7 +43,7 @@ function get_policy_reply(array $knowledge, string $intent, string $lang): ?stri
 function build_product_reply(array $products, array $entities, string $lang = "en"): string
 {
     if (empty($products)) {
-        if (is_numeric($entities["max_price"])) {
+        if (isset($entities["max_price"]) && is_numeric($entities["max_price"])) {
             return $lang === "tr"
                 ? "$" . number_format((float) $entities["max_price"], 2) . " altında tam eşleşme bulamadım. Bütçeyi biraz artırıp tekrar deneyebilirsin."
                 : "I couldn't find matches under $" . number_format((float) $entities["max_price"], 2) . ". Try a slightly higher budget or broader keywords.";
@@ -63,7 +63,7 @@ function build_product_reply(array $products, array $entities, string $lang = "e
             continue;
         }
 
-        $lines[] = "- {$name} (${$price})";
+        $lines[] = "- " . $name . " ($" . $price . ")";
     }
 
     if (empty($lines)) {
