@@ -1266,7 +1266,20 @@ function checkout() {
         saveCart();
         window.location.href = "orders.php?order_id=" + data.order_id;
       } else {
-        alert(uiText("Checkout failed: ", "Ödeme başarısız: ") + (data.error || uiText("Unknown error", "Bilinmeyen hata")));
+        const raw = data.error || uiText("Unknown error", "Bilinmeyen hata");
+        let msg = raw;
+        if (/insufficient stock/i.test(raw)) {
+          msg = uiText(
+            "Some items in your cart are out of stock or low in stock. Please adjust quantities and try again.",
+            "Sepetinizdeki bazı ürünler stokta yok veya yetersiz. Lütfen miktarı azaltıp tekrar deneyin."
+          ) + "\n\n" + raw;
+        } else if (/stock just changed/i.test(raw)) {
+          msg = uiText(
+            "Stock just changed. Please refresh the page and try again.",
+            "Stok az önce değişti. Lütfen sayfayı yenileyip tekrar deneyin."
+          );
+        }
+        alert(uiText("Checkout failed: ", "Ödeme başarısız: ") + msg);
         if (btn) { btn.disabled = false; btn.textContent = uiText("Complete Purchase", "Satın Almayı Tamamla"); }
       }
     })

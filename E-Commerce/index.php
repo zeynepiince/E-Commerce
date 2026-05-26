@@ -119,7 +119,9 @@ $selectedCategory = $_GET['category'] ?? '';
         ");
 
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $cat = strtolower(trim($row['category_name'] ?? ''));
+            // DB'deki kategori adını ("women's clothing", "Jewelery"...) site slug'ına
+            // ("women", "jewelry") indir; aynı kategori ayrı satırlarda görünmesin.
+            $cat = normalize_category_slug($row['category_name'] ?? '');
             $sub = strtolower(trim($row['sub_category'] ?? ''));
 
             if ($cat === '') {
@@ -135,11 +137,21 @@ $selectedCategory = $_GET['category'] ?? '';
             }
         }
 
+        // DB'de hiç temsil edilmeyen kategorileri default listesinden tamamla;
+        // mevcutsa default sub-cat'leri ekleyip birleştir (tekrar yok).
         foreach ($defaultSubCategories as $cat => $subs) {
-            if (!isset($categories[$cat]) || empty($categories[$cat])) {
+            if (!isset($categories[$cat])) {
                 $categories[$cat] = $subs;
+                continue;
+            }
+            foreach ($subs as $s) {
+                if (!in_array($s, $categories[$cat], true)) {
+                    $categories[$cat][] = $s;
+                }
             }
         }
+
+        ksort($categories);
 
     } catch (Throwable $e) {
         $categories = $defaultSubCategories;

@@ -9,7 +9,7 @@ $sort = $_GET['sort'] ?? 'popular';
 $searchQuery = $_GET['q'] ?? '';
 $seasonal = strtolower(trim((string) ($_GET['seasonal'] ?? '')));
 
-// Categories
+// Categories: DB'deki tutarsız adları normalize edip benzersiz slug'lar olarak göster
 $categories = [];
 try {
     $catStmt = $pdo->query("
@@ -17,7 +17,13 @@ try {
         FROM categories 
         ORDER BY category_name
     ");
-    $categories = $catStmt->fetchAll(PDO::FETCH_COLUMN);
+    $rawCats = $catStmt->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($rawCats as $rc) {
+        $slug = normalize_category_slug($rc);
+        if ($slug !== '' && !in_array($slug, $categories, true)) {
+            $categories[] = $slug;
+        }
+    }
 } catch (PDOException $e) {
     $categories = [];
 }
@@ -43,8 +49,15 @@ $sql = "
 $params = [];
 
 if ($selectedCategory !== '') {
-    $sql .= " AND LOWER(c.category_name) = LOWER(?)";
-    $params[] = $selectedCategory;
+    // Kullanıcı 'women' slug'ını seçtiyse DB'deki tüm alias adları
+    // ("women's clothing", "Women", ...) ile eşleştir.
+    $catSlug = normalize_category_slug($selectedCategory);
+    $aliases = db_category_aliases($catSlug);
+    $placeholders = implode(',', array_fill(0, count($aliases), '?'));
+    $sql .= " AND LOWER(c.category_name) IN ($placeholders)";
+    foreach ($aliases as $a) {
+        $params[] = strtolower($a);
+    }
 }
 if ($selectedSubCategory !== '') {
     $sql .= " AND LOWER(p.sub_category) = LOWER(?)";
@@ -173,7 +186,10 @@ $page_title = t("meta.products_title", "ZERA - Products");
       <?php if ($selectedCategory || $selectedSubCategory): ?>
          <?php $currentLabel = $selectedSubCategory ?: $selectedCategory; ?>
 
-         Explore our <strong> <?= htmlspecialchars(localized_category_label($currentLabel), ENT_QUOTES, 'UTF-8') ?> </strong> collection.
+         <?php $label = localized_category_label($currentLabel); ?>
+         <?= htmlspecialchars(t("products.subtitle_category_prefix", "Explore our"), ENT_QUOTES, 'UTF-8') ?>
+         <strong> <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?> </strong>
+         <?= htmlspecialchars(t("products.subtitle_category_suffix", "collection."), ENT_QUOTES, 'UTF-8') ?>
         
         <?php else: ?>
           <?= htmlspecialchars(t("products.subtitle", "Discover our"), ENT_QUOTES, 'UTF-8') ?>
@@ -192,8 +208,8 @@ $page_title = t("meta.products_title", "ZERA - Products");
           <option value=""><?= htmlspecialchars(t("products.filter.all_categories", "All categories"), ENT_QUOTES, 'UTF-8') ?></option>
           <?php foreach ($categories as $cat): ?>
             <option 
-              value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>" 
-              <?= strtolower($selectedCategory) === strtolower($cat) ? 'selected' : '' ?>
+              value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>"
+              <?= normalize_category_slug($selectedCategory) === $cat ? 'selected' : '' ?>
             >
               <?= htmlspecialchars(localized_category_label($cat), ENT_QUOTES, 'UTF-8') ?>
             </option>

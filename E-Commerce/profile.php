@@ -1,12 +1,7 @@
 <?php
 require_once 'functions.php';
 
-if (empty($_SESSION['user_id'])) {
-    header('Location: auth.php');
-    exit;
-}
-
-$userId = (int) $_SESSION['user_id'];
+$userId = require_login();
 $stmt = $pdo->prepare("SELECT user_id, full_name, email, password_hash, created_at FROM users WHERE user_id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch();

@@ -1,9 +1,66 @@
 <?php
 // Genel yapılandırma ve ortak fonksiyonlar
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . "/db.php";
 require_once __DIR__ . "/i18n.php";
+
+/**
+ * Giriş yapmamış kullanıcıyı reddeder.
+ *   - JSON istekleri (API) için 401 + JSON döner.
+ *   - Sayfa istekleri için auth.php'ye yönlendirir; geri dönüş URL'sini ?return= olarak iletir.
+ *
+ * Korunmak istenen her sayfa/endpoint en üstte çağırmalı.
+ */
+function require_login(): int
+{
+    if (!empty($_SESSION['user_id'])) {
+        return (int) $_SESSION['user_id'];
+    }
+
+    $isJson = (
+        (isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false)
+        || (isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+        || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+    );
+
+    if ($isJson) {
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'Unauthorized', 'code' => 'login_required']);
+        exit;
+    }
+
+    $return = $_SERVER['REQUEST_URI'] ?? '';
+    $location = 'auth.php';
+    if ($return !== '') {
+        $location .= '?return=' . urlencode($return);
+    }
+    header('Location: ' . $location);
+    exit;
+}
+
+/**
+ * Bir kaynağın belirli bir kullanıcıya ait olduğunu doğrular.
+ * Eşleşmezse JSON ise 403 JSON, değilse anasayfaya yönlendirir.
+ */
+function require_owner(int $ownerId, int $userId): void
+{
+    if ($ownerId === $userId) {
+        return;
+    }
+    $isJson = isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false;
+    if ($isJson) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'Forbidden']);
+        exit;
+    }
+    header('Location: index.php');
+    exit;
+}
 
 /** Hepsiburada/Trendyol tarzı ürün etiketleri */
 const PRODUCT_BADGES = [
@@ -137,18 +194,61 @@ function redirect(string $path): void
     exit;
 }
 
+/**
+ * DB'deki tutarsız kategori adlarını ("women's clothing", "Jewelery" vb.)
+ * site genelinde kullanılan slug'lara ("women", "jewelry") çevirir.
+ * Slug zaten temizse aynısını döner.
+ */
+function normalize_category_slug(?string $raw): string
+{
+    $v = strtolower(trim((string) $raw));
+    if ($v === "") return "";
+    $map = [
+        "women's clothing" => "women",
+        "womens clothing"  => "women",
+        "women clothing"   => "women",
+        "men's clothing"   => "men",
+        "mens clothing"    => "men",
+        "men clothing"     => "men",
+        "jewelery"         => "jewelry",
+        "jewellery"        => "jewelry",
+        "fashion"          => "fashion",
+    ];
+    return $map[$v] ?? $v;
+}
+
+/**
+ * Slug'tan ("women", "jewelry") DB'de gerçekten depolanmış olabilecek
+ * alternatif kategori adlarını döner. SQL filter'da
+ *   WHERE LOWER(category_name) IN (?, ?, ...)
+ * şeklinde kullanılır.
+ */
+function db_category_aliases(string $slug): array
+{
+    $slug = strtolower(trim($slug));
+    $reverse = [
+        "women"   => ["women", "women's clothing", "womens clothing"],
+        "men"     => ["men", "men's clothing", "mens clothing"],
+        "jewelry" => ["jewelry", "jewelery", "jewellery"],
+    ];
+    return $reverse[$slug] ?? [$slug];
+}
+
 function localized_category_label(?string $raw): string
 {
     $value = trim((string) $raw);
     if ($value === "") return $value;
 
     $lang = function_exists("get_current_lang") ? get_current_lang() : "en";
-    $key = strtolower(str_replace(["-", "_"], " ", $value));
+    // Önce slug normalizasyonu, sonra map lookup
+    $normalized = normalize_category_slug($value);
+    $key = strtolower(str_replace(["-", "_"], " ", $normalized));
 
     $mapTr = [
         "electronics" => "Elektronik",
         "women" => "Kadın",
         "men" => "Erkek",
+        "fashion" => "Moda",
         "home" => "Ev",
         "beauty" => "Güzellik",
         "sports" => "Spor",

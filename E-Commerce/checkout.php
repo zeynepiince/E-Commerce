@@ -46,14 +46,14 @@ if (
     }
 
     $cart    = $data['cart'];
-    $user_id = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : 1;
+    $user_id = require_login();
 
     try {
         $pdo->beginTransaction();
 
         $total = 0;
         foreach ($cart as $item) {
-            $total += $item["price"] * $item["qty"];
+            $total += (float) ($item["price"] ?? 0) * (int) ($item["qty"] ?? 1);
         }
 
         $stmt = $pdo->prepare(
@@ -68,13 +68,43 @@ if (
             "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
              VALUES (?, ?, ?, ?)"
         );
+        $stockSelect = $pdo->prepare("SELECT name, stock_quantity FROM products WHERE product_id = ? FOR UPDATE");
+        $stockUpdate = $pdo->prepare(
+            "UPDATE products SET stock_quantity = stock_quantity - ?
+             WHERE product_id = ? AND stock_quantity >= ?"
+        );
 
         foreach ($cart as $item) {
+            $qty               = max(1, (int) ($item["qty"] ?? 1));
             $resolvedProductId = resolve_product_id_for_order_item($pdo, is_array($item) ? $item : []);
+
+            if ($resolvedProductId !== null) {
+                $stockSelect->execute([$resolvedProductId]);
+                $row = $stockSelect->fetch(PDO::FETCH_ASSOC);
+                if ($row === false) {
+                    throw new RuntimeException("Product not found (id={$resolvedProductId})");
+                }
+                $available = (int) ($row['stock_quantity'] ?? 0);
+                if ($available < $qty) {
+                    throw new RuntimeException(
+                        "Insufficient stock for \"" . ($row['name'] ?? '#' . $resolvedProductId) .
+                        "\" (requested {$qty}, available {$available})"
+                    );
+                }
+
+                $stockUpdate->execute([$qty, $resolvedProductId, $qty]);
+                if ($stockUpdate->rowCount() === 0) {
+                    throw new RuntimeException(
+                        "Stock just changed for \"" . ($row['name'] ?? '#' . $resolvedProductId) .
+                        "\". Please refresh and try again."
+                    );
+                }
+            }
+
             $stmtItem->execute([
                 $order_id,
                 $resolvedProductId,
-                (int) ($item["qty"] ?? 1),
+                $qty,
                 (float) ($item["price"] ?? 0)
             ]);
         }
@@ -82,18 +112,22 @@ if (
         $pdo->commit();
 
         echo json_encode([
-            "success" => true,
+            "success"  => true,
             "order_id" => $order_id
         ]);
-    } catch (Exception $e) {
-        $pdo->rollBack();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         echo json_encode([
             "success" => false,
-            "error" => $e->getMessage()
+            "error"   => $e->getMessage()
         ]);
     }
     exit;
 }
+
+require_login();
 
 $page_title = t("meta.checkout_title", "ZERA - Checkout");
 $is_checkout = true;

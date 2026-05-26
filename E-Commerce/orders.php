@@ -1,12 +1,7 @@
 <?php
 require_once 'functions.php';
 
-if (empty($_SESSION['user_id'])) {
-    header('Location: auth.php');
-    exit;
-}
-
-$user_id = (int) $_SESSION['user_id'];
+$user_id = require_login();
 
 $stmt = $pdo->prepare("
   SELECT order_id AS id, total_amount, status, created_at
