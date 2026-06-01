@@ -1,127 +1,197 @@
-# ZERA — Akıllı E-Ticaret + Chatbot
+# ZERA — AI-Powered E-Commerce Platform
 
-Yapay zeka destekli alışveriş asistanı, kişiselleştirilmiş anasayfa ve klasik bir e-ticaret akışını (ürünler, sepet, sipariş, favori, kullanıcı yönetimi) tek bir PHP uygulamasında birleştiren proje.
+ZERA is a full-stack shopping experience that combines a classic e-commerce flow (catalog, cart, checkout, orders, wishlist, user accounts) with an AI shopping assistant, bilingual UI, and server-side personalization. Built as a learning/portfolio project using **PHP 8.4**, **MySQL/MariaDB**, and **vanilla JavaScript** — no frontend framework.
 
-> **Yığın:** PHP 8.4 · MySQL/MariaDB · Vanilla JS · OpenAI API (opsiyonel) · MAMP (local)
-
----
-
-## İçindekiler
-
-1. [Genel Bakış](#1-genel-bakış)
-2. [Klasör Yapısı](#2-klasör-yapısı)
-3. [Kurulum](#3-kurulum)
-4. [Veritabanı Şeması](#4-veritabanı-şeması)
-5. [Özellikler](#5-özellikler)
-6. [Chatbot Mimarisi](#6-chatbot-mimarisi)
-7. [Kişiselleştirilmiş Anasayfa](#7-kişiselleştirilmiş-anasayfa)
-8. [Stok Yönetimi](#8-stok-yönetimi)
-9. [Yetkilendirme ve Güvenlik](#9-yetkilendirme-ve-güvenlik)
-10. [Çoklu Dil (i18n)](#10-çoklu-dil-i18n)
-11. [Ürün İçeri Aktarma & Backfill](#11-ürün-içeri-aktarma--backfill)
-12. [Kategoriler ve Alt Kategoriler](#12-kategoriler-ve-alt-kategoriler)
-13. [Geliştirme Yolculuğu (Bu projede neler değişti)](#13-geliştirme-yolculuğu)
-14. [Geleceğe Yönelik Eksikler](#14-geleceğe-yönelik-eksikler)
+> **Stack:** PHP 8.4+ · MySQL/MariaDB · Vanilla JS · OpenAI API (optional) · MAMP (local)
 
 ---
 
-## 1. Genel Bakış
+## Table of Contents
 
-ZERA, küçük-orta ölçekli bir e-ticaret deneyimini şu üç katmanda sunar:
-
-| Katman | Sorumluluk |
-|---|---|
-| **Frontend** | Vanilla JS + custom CSS, hiç framework yok. `localStorage`'ta sepet, favoriler, son görüntülenen ürünler ve chatbot sinyalleri. |
-| **Backend** | Saf PHP 8.4, PDO. Sayfalar ve JSON API'lar birlikte dosyalarda (örn. `checkout.php` aynı anda hem sayfa hem `application/json` endpoint'i). |
-| **Yapay Zeka** | Rule-based intent çözümleyici + OpenAI `gpt-4o-mini` (opsiyonel, `OPENAI_API_KEY` set edilirse). Vektör DB / RAG yok. |
+1. [Overview](#1-overview)
+2. [Features](#2-features)
+3. [Project Structure](#3-project-structure)
+4. [Requirements](#4-requirements)
+5. [Installation](#5-installation)
+6. [Configuration](#6-configuration)
+7. [Database](#7-database)
+8. [Running the App](#8-running-the-app)
+9. [Chatbot Architecture](#9-chatbot-architecture)
+10. [Recommendations & Personalization](#10-recommendations--personalization)
+11. [Inventory Management](#11-inventory-management)
+12. [Authentication & Security](#12-authentication--security)
+13. [Internationalization (i18n)](#13-internationalization-i18n)
+14. [Product Import & Backfill](#14-product-import--backfill)
+15. [Categories & Subcategories](#15-categories--subcategories)
+16. [API & Endpoints](#16-api--endpoints)
+17. [Known Limitations](#17-known-limitations)
+18. [License & Contributing](#18-license--contributing)
 
 ---
 
-## 2. Klasör Yapısı
+## 1. Overview
+
+ZERA is organized in three layers:
+
+| Layer | Responsibility |
+|--------|----------------|
+| **Frontend** | Vanilla JS + custom CSS. Cart, favorites, and recently viewed products live in `localStorage`. Chatbot UI is embedded in the global footer. |
+| **Backend** | Plain PHP with PDO. Pages and JSON APIs coexist in the same files (e.g. `checkout.php` serves both the checkout page and a JSON checkout endpoint). |
+| **AI** | Regex-based intent detection + optional OpenAI `gpt-4o-mini` when `OPENAI_API_KEY` is set. No vector database or RAG pipeline. |
+
+The application lives under `E-Commerce/`. Point your web server document root (or MAMP URL) at that folder path.
+
+---
+
+## 2. Features
+
+### Shopping
+
+- **Guest browsing** — Browse products, search, filter, and view details without logging in.
+- **Cart** — Client-side cart stored in `localStorage` (`story_cart`). No server-side cart sync.
+- **Checkout** — Login required. Real stock validation and atomic decrement at order time.
+- **Orders** — View order history; cancel **pending** orders (stock is restored).
+- **Wishlist** — Database-backed favorites (login required to persist).
+- **Product badges** — Marketplace-style labels (e.g. Best Seller, On Sale, Fast Delivery) via JSON column or section-based defaults.
+
+### AI & Personalization
+
+- **Floating chatbot** — Product search, add-to-cart suggestions, policy answers, session memory.
+- **“Recommended for you”** — Server-side scoring from favorites and past orders (`recommended.php`).
+- **Previously bought** — Logged-in users see items from order history on the homepage.
+
+### Platform
+
+- **Bilingual UI** — Turkish and English via dictionary files and `?lang=tr|en`.
+- **Environment-based DB config** — `.env` file with TCP or Unix socket support.
+- **One-click product import** — Pull catalog data from Fake Store API or DummyJSON.
+
+---
+
+## 3. Project Structure
 
 ```
 chatbotv2/
-├── .gitignore              # .env, vendor/, node_modules/, IDE dosyaları
+├── .gitignore
+├── README.md
 └── E-Commerce/
-    ├── .env.example        # Üretime taşırken kopyala → .env
-    ├── db.php              # Env tabanlı DB bağlantısı (TCP veya unix socket)
-    ├── functions.php       # Ortak helper'lar (i18n, auth guard, kategori normalize, ürün veri çekme)
-    ├── i18n.php            # Çoklu dil motoru (tr/en)
+    ├── .env.example          # Copy to .env (not committed)
+    ├── db.php                # PDO connection + .env loader
+    ├── functions.php         # Auth guards, categories, badges, product helpers
+    ├── i18n.php              # Translation engine
     ├── locales/
-    │   ├── tr.php          # Türkçe sözlük
-    │   └── en.php          # İngilizce sözlük
-    ├── auth.php            # Giriş + Kayıt (standalone sayfa, tam i18n)
+    │   ├── en.php
+    │   └── tr.php
+    ├── auth.php              # Login & registration
     ├── logout.php
-    ├── index.php           # Anasayfa: hero slider, kategori navigasyonu, öne çıkanlar, kişiselleştirilmiş bölüm
-    ├── products.php        # Ürün listeleme + filtre (kategori, alt kategori, fiyat, sıralama, arama, sezon)
-    ├── product_detail.php  # Ürün detay sayfası
-    ├── checkout.php        # Ödeme sayfası + checkout JSON API (stok düşme dahil)
-    ├── orders.php          # Sipariş listesi
-    ├── cancel_order.php    # Sipariş iptali JSON API (stok geri yansıması dahil)
-    ├── profile.php         # Kullanıcı profili (son siparişler dahil)
-    ├── wishlist.php        # Favori listesi
-    ├── recommended.php     # Öneri API
-    ├── personalized_home_api.php  # Kişiselleştirilmiş anasayfa API
-    ├── import_products.php # Fake Store / DummyJSON'dan ürün importu + sub_category backfill
-    ├── chatbot_api.php     # Chatbot ana giriş noktası
+    ├── index.php             # Homepage (hero, categories, featured, recommendations)
+    ├── products.php          # Catalog with filters & search
+    ├── product_detail.php
+    ├── checkout.php          # Checkout page + JSON API
+    ├── orders.php
+    ├── cancel_order.php      # Cancel order JSON API
+    ├── profile.php
+    ├── wishlist.php
+    ├── recommended.php       # AI recommendation scoring logic
+    ├── import_products.php   # External API import + backfill tools
+    ├── chatbot_api.php       # Chatbot entry point
     ├── chatbot/
-    │   ├── intent.php      # Niyet sınıflandırma (regex tabanlı + opsiyonel LLM)
-    │   ├── actions.php     # SQL-tabanlı ürün araması, sepet aksiyonları
-    │   ├── responses.php   # Yanıt formatlama
-    │   ├── helpers.php     # Entity çıkarımı (renk, marka, fiyat, vs.)
-    │   └── ai.php          # OpenAI cURL wrapper'ı
+    │   ├── intent.php        # Intent classification (regex + optional LLM)
+    │   ├── helpers.php       # Entity extraction (price, color, brand, etc.)
+    │   ├── actions.php       # SQL product search, cart actions
+    │   ├── responses.php     # Response formatting
+    │   └── ai.php            # OpenAI cURL wrapper
+    ├── knowledge/
+    │   └── policies.php      # Static policy knowledge for chatbot
     ├── includes/
-    │   ├── header.php      # Navbar + dil değiştirici
-    │   ├── footer.php      # Footer + chatbot widget + auth modal
+    │   ├── header.php        # Navbar + language switcher
+    │   ├── footer.php        # Footer + chatbot widget + auth modal
     │   ├── product_card.php
     │   └── home_product_card.php
+    ├── migrations/
+    │   └── add_product_badges.sql
+    ├── setup_users.sql       # Users table bootstrap
     └── assets/
-        ├── css/            # Tema CSS dosyaları
-        └── js/main.js      # Tek dosya: sepet, favori, chatbot UI, kişiselleştirme
+        ├── css/              # style, navbar, homepage, products, auth, etc.
+        └── js/
+            ├── main.js       # Cart, favorites, chatbot UI, checkout
+            ├── homepage.js
+            ├── products.js
+            ├── orders.js
+            └── profile.js
 ```
 
 ---
 
-## 3. Kurulum
+## 4. Requirements
 
-### Gereksinimler
+- **PHP 8.4+** (8.1+ may work; tested on 8.4)
+- **MySQL 5.7+** or **MariaDB 10.3+**
+- **Apache** (e.g. MAMP) or any PHP-capable web server
+- **Optional:** [OpenAI API key](https://platform.openai.com/) for LLM-enhanced chatbot replies
 
-- MAMP (veya benzer Apache + MySQL/MariaDB)
-- PHP **8.4+** (8.1+ çalışır ama 8.4'te test edildi)
-- MySQL/MariaDB ile `chatbotv2_db` adlı veritabanı
+---
 
-### Adımlar
+## 5. Installation
+
+### 1. Clone the repository
 
 ```bash
-# 1. Repo'yu MAMP htdocs klasörüne klonla
-cd /Applications/MAMP/htdocs
-git clone <repo-url> chatbotv2
-
-# 2. .env oluştur
-cp E-Commerce/.env.example E-Commerce/.env
-# .env içini düzenle (MAMP default: user=root, pass=root, port 8889)
-
-# 3. Veritabanını oluştur (phpMyAdmin'de veya CLI'da)
-mysql -u root -p -e "CREATE DATABASE chatbotv2_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-
-# 4. (Şema otomatik oluşmuyorsa) tabloları SQL dump'tan import et
-# Bu projede SQL dump dosyası repo'da yer almıyor; mevcut bir kopyadan
-# içe aktarmalısınız. Tablolar §4'te listelendi.
-
-# 5. MAMP'ı başlat ve şu URL'yi aç:
-# http://localhost:8888/chatbotv2/E-Commerce/index.php
-
-# 6. (İlk kez) Ürün importu çalıştır:
-# http://localhost:8888/chatbotv2/E-Commerce/import_products.php?source=dummy&limit=100
-
-# 7. Alt kategorileri doldur:
-# http://localhost:8888/chatbotv2/E-Commerce/import_products.php?backfill_subcat=1
+cd /Applications/MAMP/htdocs   # or your web root
+git clone <repository-url> chatbotv2
+cd chatbotv2
 ```
 
-### .env Yapılandırması
+### 2. Create environment file
+
+```bash
+cp E-Commerce/.env.example E-Commerce/.env
+```
+
+Edit `E-Commerce/.env` with your database credentials (see [Configuration](#6-configuration)).
+
+### 3. Create the database
+
+```bash
+mysql -u root -p -e "CREATE DATABASE chatbotv2_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+Import your schema if you have a SQL dump. At minimum, run:
+
+```bash
+mysql -u root -p chatbotv2_db < E-Commerce/setup_users.sql
+mysql -u root -p chatbotv2_db < E-Commerce/migrations/add_product_badges.sql
+```
+
+> The repo does not ship a full schema dump. You need existing `products`, `categories`, `orders`, and related tables, or import from a backup.
+
+### 4. Start MAMP (or your stack)
+
+Ensure Apache and MySQL are running.
+
+### 5. Seed products (first run)
+
+Open in the browser:
+
+```
+http://localhost:8888/chatbotv2/E-Commerce/import_products.php?source=dummy&limit=100
+```
+
+Then backfill subcategories:
+
+```
+http://localhost:8888/chatbotv2/E-Commerce/import_products.php?backfill_subcat=1
+```
+
+Adjust host/port if your MAMP setup differs (default Apache port is often `8888`, MySQL `8889`).
+
+---
+
+## 6. Configuration
+
+### Database (`.env`)
 
 ```env
-# TCP üzerinden bağlantı (varsayılan)
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=chatbotv2_db
@@ -129,362 +199,283 @@ DB_USER=root
 DB_PASS=root
 DB_CHARSET=utf8mb4
 
-# Alternatif: Unix socket (MAMP/Homebrew için pratik)
+# Optional: Unix socket (MAMP) — overrides host/port when set
 # DB_SOCKET=/Applications/MAMP/tmp/mysql/mysql.sock
-
-# Chatbot için (opsiyonel)
-# OPENAI_API_KEY=sk-...
 ```
 
-`DB_SOCKET` set edilirse `DB_HOST`/`DB_PORT` görmezden gelinir.
+Priority: MAMP defaults in `db.php` → `.env` file → environment variables (`DB_HOST`, `DB_PORT`, etc.).
 
----
+### OpenAI (optional)
 
-## 4. Veritabanı Şeması
-
-Ana tablolar:
-
-| Tablo | Önemli kolonlar |
-|---|---|
-| `users` | `user_id`, `full_name`, `email`, `password_hash`, `created_at` |
-| `products` | `product_id`, `external_id`, `name`, `price`, `description`, `image_url`, `category_id`, `sub_category`, `stock_quantity`, `is_featured`, `badges` (JSON) |
-| `categories` | `category_id`, `category_name` |
-| `orders` | `order_id`, `user_id`, `total_amount`, `status` (pending/cancelled), `created_at` |
-| `order_items` | `order_id`, `product_id`, `quantity`, `unit_price` |
-| `user_favorites` | `user_id`, `product_id`, `created_at` |
-
-> Daha önce mevcut olan `chatbot_metrics` ve `chatbot_feedback` tabloları projeden çıkarıldı (bkz. §13).
-
----
-
-## 5. Özellikler
-
-### Mevcut Akışlar
-
-- **Misafir gezintisi:** Giriş yapmadan ürün listeleme, arama, detay, sepete ekleme (localStorage).
-- **Kayıt ve giriş:** `auth.php` — bcrypt parola, session_regenerate_id, open-redirect güvenli return URL.
-- **Sepet:** Tamamen client-side (`localStorage` → `story_cart`). Server senkronizasyonu yok.
-- **Checkout:** Login zorunlu; gerçek stok kontrolü ve düşmesi (bkz. §8).
-- **Sipariş listesi & iptal:** "Pending" durumdaki siparişler iptal edilebilir, stok otomatik geri yansır.
-- **Favori (wishlist):** DB tabanlı, login gerekli.
-- **Çoklu dil:** TR / EN, anlık geçişle. URL'de `?lang=tr|en`.
-- **Chatbot:** Sağ alt köşede widget; ürün arama, sepete ekleme, kategori önerme, politika cevapları.
-- **Kişiselleştirilmiş anasayfa:** Browsing history + favoriler + sepet + chatbot sinyallerine göre ürün önerisi (bkz. §7).
-- **Ürün importu:** Fake Store API veya DummyJSON'dan tek tıkla içe aktarma (bkz. §11).
-
----
-
-## 6. Chatbot Mimarisi
-
-Klasik RAG değil; **regex tabanlı niyet sınıflandırma + opsiyonel LLM** karmasıdır.
-
-```
-Kullanıcı mesajı
-      │
-      ▼
-┌─────────────────────────────────┐
-│ chatbot/intent.php              │
-│  • Regex pattern eşleştirme     │
-│  • LLM fallback (anahtar varsa) │  ← OPENAI_API_KEY
-└─────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────┐
-│ chatbot/helpers.php              │
-│  • Entity çıkar (renk, marka,    │
-│    fiyat, kategori, audience)    │
-└─────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────┐
-│ chatbot/actions.php              │
-│  • SQL: products WHERE name LIKE │
-│  • Sepet/favori aksiyonları      │
-│  • Politika cevapları (statik)   │
-└─────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────┐
-│ chatbot/responses.php            │
-│  • Sonuçları kullanıcı dostu     │
-│    HTML/JSON yanıta dönüştür     │
-└─────────────────────────────────┘
-      │
-      ▼
-$_SESSION['chatbot_memory'] güncellenir
-      │
-      ▼
-JSON yanıt → frontend
+```env
+OPENAI_API_KEY=sk-...
 ```
 
-Frontend (`main.js`) yanıtı aldığında `localStorage['story_chat_signals']` içine son mesajı, intent'i, çıkarılan entity'leri ve kullanıcı profili sinyallerini yazar. Bu sinyaller bir sonraki ziyarette **kişiselleştirilmiş anasayfa**ya yansır.
+Without this key, the chatbot still works using regex intents and rule-based responses.
 
 ---
 
-## 7. Kişiselleştirilmiş Anasayfa
+## 7. Database
 
-**Dosyalar:** `personalized_home_api.php` · `assets/js/main.js` · `index.php`
+### Core tables
 
-### Akış
+| Table | Purpose |
+|--------|---------|
+| `users` | Accounts (`user_id`, `full_name`, `email`, `password_hash`, …) |
+| `products` | Catalog (`product_id`, `name`, `price`, `description`, `image_url`, `category_id`, `sub_category`, `stock_quantity`, `badges`, `is_featured`, …) |
+| `categories` | Top-level categories (`category_id`, `category_name`) |
+| `orders` | Orders (`order_id`, `user_id`, `total_amount`, `status`, `created_at`) |
+| `order_items` | Line items per order |
+| `user_favorites` | Wishlist rows (`user_id`, `product_id`) |
 
-1. Sayfa yüklenince `main.js` → `loadPersonalizedHome()`:
-   - `localStorage`'tan son görüntülenenler, favoriler, sepet ve chat sinyallerini toplar.
-   - POST `personalized_home_api.php`'ye yollar.
-2. Backend:
-   - Client sinyalleri + `$_SESSION['chatbot_memory']` + `$_SESSION['user_profile']`'ı birleştirir.
-   - **Median fiyat** ile bütçe ipucu çıkarır.
-   - **Sezon kelimeleri** ekler (ay bazlı: yaz/kış).
-   - Tarama/favori/sepet'teki ürünleri **hariç tutar** (zaten bilinenler).
-   - SQL'i kategoriler, anahtar kelime LIKE'ları ve fiyat aralığıyla şekillendirir.
-   - Sonuç boşsa rastgele ürünlerle doldurur (fallback).
-3. Backend ayrıca dinamik bir **Türkçe açıklama** üretir:
-   > "Sepetinizdeki spor ürünlere bakarak benzer kategoride seçtiklerim."
+### Migrations
 
-4. Frontend gelen ürünleri `personalizedHomeSection` içine render eder.
-
----
-
-## 8. Stok Yönetimi
-
-Sembolik değil, gerçek bir sistem:
-
-| Senaryo | Davranış |
-|---|---|
-| **Sipariş tamamlandı** | Her item için `UPDATE products SET stock_quantity = stock_quantity - ? WHERE product_id = ? AND stock_quantity >= ?` (atomik). `FOR UPDATE` ile satır kilidi. |
-| **Stok yetersiz** | Transaction rollback, sipariş oluşmaz. Frontend'e net mesaj: *"Sepetinizdeki bazı ürünler stokta yok…"* |
-| **Eş zamanlı yarış** | `WHERE stock_quantity >= ?` koşulu yarış'ı atomik kırıyor — kaybeden taraf hata alıyor. |
-| **Sipariş iptali** | `cancel_order.php` transaction içinde `order_items`'ı okur, her birinin `quantity`'sini `stock_quantity`'ye geri ekler. |
-| **Sepete ekleme** | Client-side, rezervasyon yok (kasıtlı tercih). Doğrulama checkout anında yapılır. |
-
-Test senaryoları başarılı:
-- 100 stoklu ürün → 3 adet sipariş → stok 97 → iptal → stok 100 ✓
-- 2 stoklu üründen 5 talep → sipariş engellendi, transaction rollback ✓
+| File | Action |
+|------|--------|
+| `setup_users.sql` | Creates `users` table if missing |
+| `migrations/add_product_badges.sql` | Adds `products.badges` JSON column |
 
 ---
 
-## 9. Yetkilendirme ve Güvenlik
+## 8. Running the App
 
-### Merkezi guard
+**Homepage:**
 
-`functions.php` içindeki iki helper:
+```
+http://localhost:8888/chatbotv2/E-Commerce/index.php
+```
+
+**Other pages:**
+
+| Page | URL |
+|------|-----|
+| Products | `.../E-Commerce/products.php` |
+| Login / Register | `.../E-Commerce/auth.php` |
+| Profile | `.../E-Commerce/profile.php` |
+| Orders | `.../E-Commerce/orders.php` |
+| Wishlist | `.../E-Commerce/wishlist.php` |
+
+Switch language: append `?lang=en` or `?lang=tr` to any page.
+
+---
+
+## 9. Chatbot Architecture
+
+Not a RAG system — a **hybrid of regex intent matching and optional LLM fallback**.
+
+```
+User message
+     │
+     ▼
+┌─────────────────────┐
+│ chatbot/intent.php  │  Regex patterns + optional OpenAI
+└─────────────────────┘
+     │
+     ▼
+┌─────────────────────┐
+│ chatbot/helpers.php │  Extract entities (price, category, color, brand…)
+└─────────────────────┘
+     │
+     ▼
+┌─────────────────────┐
+│ chatbot/actions.php │  SQL search, cart hints, policy lookup
+└─────────────────────┘
+     │
+     ▼
+┌──────────────────────┐
+│ chatbot/responses.php│  Format user-facing reply + product cards
+└──────────────────────┘
+     │
+     ▼
+$_SESSION['chatbot_memory'] updated → JSON response
+```
+
+**Entry point:** `POST` to `chatbot_api.php` with JSON body:
+
+```json
+{ "message": "show me red dresses under 500", "cart": [], "page": "products" }
+```
+
+**Policy answers** are served from `knowledge/policies.php` when the user asks about shipping, returns, etc.
+
+---
+
+## 10. Recommendations & Personalization
+
+**File:** `recommended.php` — function `get_ai_recommendations()`
+
+Scoring (logged-in users):
+
+| Signal | Weight |
+|--------|--------|
+| Favorite in category | +5 |
+| Ordered from category | +8 |
+
+Top categories drive a SQL query for fresh product suggestions. Guests receive randomized picks.
+
+The homepage (`index.php`) also loads:
+
+- **Featured** products (`is_featured = 1`)
+- **Previously bought** (from `orders` + `order_items`)
+- **Best sellers / deals** (random samples for demo sections)
+
+Client-side signals (`story_recent`, `story_favorites`, `story_cart` in `localStorage`) support UX; primary server personalization uses DB data when logged in.
+
+---
+
+## 11. Inventory Management
+
+Real stock handling — not cosmetic counters.
+
+| Event | Behavior |
+|--------|----------|
+| **Checkout** | `SELECT … FOR UPDATE`, then `UPDATE products SET stock_quantity = stock_quantity - ? WHERE … AND stock_quantity >= ?` per line item inside a transaction. |
+| **Insufficient stock** | Transaction rolls back; client receives a clear error. |
+| **Order cancel** | `cancel_order.php` restores quantities from `order_items`. |
+| **Add to cart** | No reservation — stock is checked only at checkout (by design). |
+
+Default import stock: `100` units per product (configurable in `import_products.php`).
+
+---
+
+## 12. Authentication & Security
+
+### Helpers (`functions.php`)
 
 ```php
-require_login(): int    // Korumalı sayfaların başına çağrılır
+require_login(): int      // Protected pages/APIs — 401 JSON or redirect to auth.php
 require_owner($ownerId, $userId): void
 ```
 
-- JSON istekleri (XHR, `application/json`) için: HTTP 401 + JSON gövdesi.
-- Normal sayfa istekleri için: `auth.php?return=<gelinen URL>`'ye yönlendirme.
-- Login başarılı olduğunda `return` parametresine geri yönlendirir.
+### Implemented
 
-### Open-redirect koruması
+- **bcrypt** passwords via `password_hash()`
+- **`session_regenerate_id(true)`** on login (session fixation mitigation)
+- **Open-redirect protection** — `safe_return_url()` only allows relative in-app paths
+- **Owner checks** on orders and profile data
 
-`safe_return_url()` filtresi:
-- Sadece **göreceli yollar** kabul edilir.
-- `//evil.com`, `https://...`, `javascript:...` reddedilir → `index.php` fallback.
+### Protected resources
 
-### Session güvenliği
+| File | Protection |
+|------|------------|
+| `profile.php` | `require_login()` |
+| `orders.php` | `require_login()` |
+| `checkout.php` (JSON POST) | `require_login()` |
+| `cancel_order.php` | `require_login()` |
 
-- Login anında `session_regenerate_id(true)` → session fixation engellenir.
-- Parolalar `password_hash(PASSWORD_DEFAULT)` ile bcrypt.
+### Not included (see [Known Limitations](#17-known-limitations))
 
-### Korumalı endpoint'ler
-
-| Dosya | Korumalı mı? |
-|---|---|
-| `profile.php` | ✓ require_login |
-| `orders.php` | ✓ require_login |
-| `checkout.php` (GET + POST) | ✓ require_login |
-| `cancel_order.php` | ✓ require_login |
-| `wishlist.php` | Misafire boş listede gösterir (kasıtlı) |
-
-> **Üretim için eksikler (üzerinde durulmadı):** CSRF token, rate limiting (auth.php brute-force), HTTPS-only/SameSite cookie bayrakları, logout'ta cookie clear. Bkz. §14.
+CSRF tokens, rate limiting, HTTPS-only cookies, email verification, password reset flow.
 
 ---
 
-## 10. Çoklu Dil (i18n)
+## 13. Internationalization (i18n)
 
-### Motor
-
-`i18n.php` — sözlük tabanlı basit motor:
+**Engine:** `i18n.php` + locale dictionaries.
 
 ```php
-echo t("home.hero.new_arrivals", "New arrivals just dropped");
+echo t('home.hero.new_arrivals', 'New arrivals just dropped');
 ```
 
-Aktif dil sırası:
-1. `?lang=tr|en` query parametresi
-2. `_SESSION['lang']`
-3. URI'da `/tr/` veya `/en/` prefix'i
-4. `DEFAULT_LANG` (en)
+**Language resolution order:**
 
-### Sözlükler
+1. `?lang=tr` or `?lang=en`
+2. `$_SESSION['lang']`
+3. URI prefix `/tr/` or `/en/` (if used)
+4. Default: `en`
 
-- `locales/tr.php` — Türkçe (~250+ anahtar)
-- `locales/en.php` — İngilizce (~250+ anahtar)
+**Dictionaries:** `locales/en.php`, `locales/tr.php` (~250+ keys each).
 
-### Kategori etiketleri
-
-`localized_category_label("women")` → TR: *"Kadın"*, EN: *"Women"*.
-
-Slug normalizasyonu (bkz. §12) sayesinde DB'de "women's clothing", "Women", "WOMEN" gibi varyasyonların hepsi aynı slug'a düşer ve doğru etiketi alır.
-
-### TR sayfada İngilizce sızıntısı sıfır
-
-`products.php`, `auth.php`, header, footer dahil tüm sayfa metni `t()` ile çevriliyor. Hardcoded İngilizce string kalmadı.
+Category labels use `localized_category_label()` with slug normalization so DB variants like `Women's Clothing` and `women` map to one UI label.
 
 ---
 
-## 11. Ürün İçeri Aktarma & Backfill
+## 14. Product Import & Backfill
 
-### Kullanım
+**Script:** `import_products.php` (browser or CLI via `php -f` if configured).
 
-| URL | Ne yapar? |
-|---|---|
-| `import_products.php` | Fake Store API'dan ilk 20 ürünü çeker |
-| `import_products.php?limit=50` | 50 ürün çeker |
-| `import_products.php?source=dummy&limit=100` | DummyJSON'dan 100 ürün (description'lar zengin) |
-| `import_products.php?backfill_stock=1` | Mevcut `NULL`/`0` stoklu ürünleri 100'e çeker |
-| `import_products.php?backfill_subcat=1` | `sub_category` boş olanlara isim/açıklamaya bakıp slug atar |
-| `import_products.php?backfill_subcat=1&force=1` | Dolu olanları da yeniden hesaplar |
+| URL | Action |
+|-----|--------|
+| `import_products.php` | Fake Store API, 20 products |
+| `import_products.php?limit=50` | Fake Store, custom limit |
+| `import_products.php?source=dummy&limit=100` | DummyJSON (richer descriptions) |
+| `import_products.php?backfill_stock=1` | Set NULL/0 stock to 100 |
+| `import_products.php?backfill_subcat=1` | Infer `sub_category` from name/description |
+| `import_products.php?backfill_subcat=1&force=1` | Recompute all subcategories |
 
-### Yapılan iyileştirmeler (önceki "1054 Unknown column" hatasından bu yana)
-
-1. Önceki `category` VARCHAR yerine doğru `category_id` foreign key kullanılıyor.
-2. **`resolve_category_id()`** — API'nin dönüştürdüğü kategori isimlerini (`womens-dresses`, `mens-shirts`, `kitchen-accessories`, `fragrances`...) DB'deki 6 ana kategoriye eşler.
-3. **`infer_subcategory()`** — Adı ve açıklamadan keyword-tabanlı slug çıkarımı. Site navigasyonundaki tüm slug'lar destekli.
-4. **`stock_quantity = 100`** import sırasında varsayılan.
-5. **`COALESCE(VALUES, products.stock_quantity)`** — manuel düzenlenmiş stoklar üzerine yazılmaz.
-6. **`COALESCE(VALUES, products.sub_category)`** — backfill ile atanmış subcat re-import'ta kaybedilmez.
-7. Insert vs Update sayımı: önce `SELECT` ile var olma kontrolü (çünkü `ON DUPLICATE KEY UPDATE`'in `rowCount()` davranışı güvenilmez).
+Import maps external categories to local `category_id`, infers `sub_category` slugs, and uses upsert logic so re-imports do not wipe manually edited stock or subcategories (`COALESCE` guards).
 
 ---
 
-## 12. Kategoriler ve Alt Kategoriler
+## 15. Categories & Subcategories
 
-### Sorun
+Historical DB labels (`women's clothing`, `Jewelery`) are normalized to canonical slugs (`women`, `jewelry`) via helpers in `functions.php`:
 
-DB'de tarihten gelen tutarsız adlar (`women's clothing`, `Jewelery`), site genelindeki temiz slug'larla (`women`, `jewelry`) çakışıyordu. Sonuç: anasayfa navında **aynı kategori iki defa görünüyordu**.
+- `normalize_category_slug()` — display/filter slug
+- `db_category_aliases()` — SQL `IN (...)` alias list for filters
+- `get_subcategory_search_keywords()` — keyword map for subcategory filters
 
-### Çözüm
+Navigation deduplicates categories after normalization so the same logical category does not appear twice.
 
-`functions.php`'de iki yönlü çevirici:
+---
 
-```php
-normalize_category_slug("Women's Clothing")   // → "women"
-normalize_category_slug("Jewelery")            // → "jewelry"
+## 16. API & Endpoints
 
-db_category_aliases("women")
-// → ["women", "women's clothing", "womens clothing"]
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `chatbot_api.php` | POST JSON | Optional | Chatbot messages |
+| `checkout.php` | POST JSON | Required | Place order |
+| `cancel_order.php` | POST JSON | Required | Cancel pending order |
+| `wishlist.php` | GET/POST | Mixed | Wishlist CRUD |
+| `import_products.php` | GET | None | Import/backfill (restrict in production) |
+
+**Content-Type:** JSON endpoints expect `Content-Type: application/json`.
+
+---
+
+## 17. Known Limitations
+
+This project is suitable for demos and portfolios, not production as-is.
+
+| Area | Gap |
+|------|-----|
+| **Security** | No CSRF tokens; no login rate limiting; no strict cookie flags |
+| **Payments** | Checkout is simulated — no Stripe/PayPal integration |
+| **Email** | No verification or password reset |
+| **Orders** | Status flow is basic (`pending` → `cancelled` only) |
+| **Admin** | No admin panel — manage data via DB or phpMyAdmin |
+| **Images** | Product images are external URLs only |
+| **Tests** | No automated test suite |
+| **Import script** | Publicly callable — disable or protect in production |
+
+---
+
+## 18. License & Contributing
+
+This repository is intended for **learning and portfolio** use. Add a `LICENSE` file (e.g. MIT) if you publish it openly.
+
+**Contributing**
+
+- Open an issue for bugs or feature ideas.
+- Keep pull requests focused with a clear description of changes.
+
+---
+
+## Quick Reference
+
+```bash
+# Copy config
+cp E-Commerce/.env.example E-Commerce/.env
+
+# Create DB
+mysql -u root -p -e "CREATE DATABASE chatbotv2_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Bootstrap tables
+mysql -u root -p chatbotv2_db < E-Commerce/setup_users.sql
+mysql -u root -p chatbotv2_db < E-Commerce/migrations/add_product_badges.sql
+
+# Open app
+open http://localhost:8888/chatbotv2/E-Commerce/index.php
 ```
 
-- **Nav (`index.php`):** DB sorgusu sonrası tüm kategori adlarını slug'a indirip birleştirir.
-- **Filter (`products.php`):** Kullanıcı `?category=women` ile geldiğinde DB'deki tüm alias'larla `WHERE LOWER(category_name) IN (...)` kullanır.
-- **Dropdown:** Slug'lardan benzersizleştirilmiş liste.
-
-### Alt kategori (sub_category)
-
-`products.sub_category` kolonu boştu → tüm alt kategori menüleri boş geliyordu. Çözüm:
-
-1. **`get_subcategory_search_keywords($parent, $slug)`** — `functions.php`'de keyword haritası. Örn. `women → dress` slug'ı için `['dress','gown','sundress','frock','maxi']`.
-2. **Backfill (`?backfill_subcat=1`)** — tüm 105 ürün için isim+açıklama'dan çıkarım: 105/105 dolduruldu.
-3. Import sırasında otomatik `infer_subcategory()` çağrısı.
-
----
-
-## 13. Geliştirme Yolculuğu
-
-Bu projeyi bugünkü haline getirmek için izlenen adımlar (kronolojik):
-
-### 1. AI Shopping Assistant + Kişiselleştirilmiş Anasayfa
-- `personalized_home_api.php` oluşturuldu.
-- `index.php`'ye gizli `personalizedHomeSection` bölümü eklendi.
-- `main.js`'e `loadPersonalizedHome()` ve `persistChatSignalsForHome()` eklendi.
-- Locale dosyalarına `home.personalized_title` vb. eklendi.
-
-### 2. Chatbot RAG sorusu → Mevcut mimarinin doğrulanması
-- Kullanıcının "RAG yapısı var mı?" sorusu üzerine analiz: standart RAG yok, regex+LLM hibrit.
-- Bu seviyede RAG eklemenin proje boyutu için aşırı olduğu kararlaştırıldı.
-
-### 3. Daha fazla ürün → Import zorluk denemeleri
-- Yanlış kolon hatası: `Unknown column 'category'` → `category_id`'ye geçildi.
-- "Inserted: 0 Updated: 0" → `ON DUPLICATE KEY UPDATE`'in `rowCount()` davranışı yüzünden, `SELECT` ile ön kontrol eklendi.
-- "Out of Stock" sorunu → `stock_quantity = 100` default + `?backfill_stock=1`.
-
-### 4. Sub-category çalışmıyor sorunu
-- `products.php`'de var olmayan `p.sub_category` kolonuna sorgu → kolon DB'ye eklendi.
-- `get_subcategory_search_keywords()` keyword tabanlı filtre yazıldı.
-
-### 5. Git akışı (main vs newlast)
-- `main`'e push, çakışmalar, `newlast` branch'ine geçiş ve geri merge denemeleri.
-- Aktif branch: kullanıcının tercih ettiği son durum.
-
-### 6. `chatbot_metrics` & `chatbot_feedback` kaldırıldı
-- Kullanıcı talebiyle metrik ve feedback altyapısı tamamen silindi (kod + tablolar + UI).
-
-### 7. Sub-category backfill (bu konuşma)
-- `?backfill_subcat=1` endpoint'i eklendi → 105/105 ürün dolduruldu.
-
-### 8. Import'ta description kaydet (bu konuşma)
-- Eski insert sadece name/price/image_url içeriyordu.
-- Yeni hali: description, category_id, sub_category, stock_quantity — hepsi.
-- DummyJSON re-import → 0/105 description boştan 100/105 doluya.
-
-### 9. Gerçek stok yönetimi (bu konuşma)
-- `checkout.php`'ye FOR UPDATE row lock + atomik decrement.
-- `cancel_order.php` transaction içinde stok geri yükleme.
-- Yetersiz stokta TR/EN dostu mesaj.
-
-### 10. Yetkilendirme merkezileştirildi (bu konuşma)
-- `require_login()` helper'ı.
-- `checkout.php` POST'taki `user_id ?? 1` açığı kapatıldı.
-- `safe_return_url()` open-redirect filtresi.
-- `session_regenerate_id(true)` login'de.
-
-### 11. Üretime alma — env tabanlı DB (bu konuşma)
-- `db.php` baştan yazıldı: `.env` parser, TCP veya socket destekli.
-- `.env.example` ve `.gitignore` eklendi.
-
-### 12. Kategori dublikasyonu + TR/EN sızıntısı (bu konuşma)
-- `normalize_category_slug()` ve `db_category_aliases()` helper'ları.
-- Nav'da `women + women's clothing` tek satıra düştü.
-- `auth.php` baştan sona `t()`'ye sarıldı, hardcoded İngilizce kalmadı.
-
----
-
-## 14. Geleceğe Yönelik Eksikler
-
-Aşağıdakiler bu projede **yer almıyor**; üretime almak istenirse eklenmelidir:
-
-### Güvenlik
-- [ ] **CSRF token** — POST endpoint'leri same-origin'e dayanıyor.
-- [ ] **Rate limiting** — `auth.php` brute-force'a açık.
-- [ ] **HTTPS-only / SameSite=Strict cookie** bayrakları.
-- [ ] **Logout cookie clear** — şu an sadece `session_destroy()`, tarayıcıda PHPSESSID kalıyor.
-- [ ] Hata mesajlarının sanitize edilmesi (DB exception detayı sızabilir).
-
-### Kullanıcı akışı
-- [ ] **Şifre sıfırlama** — "Forgot password?" linki boş.
-- [ ] **Email doğrulama** — Herhangi bir email ile kayıt mümkün.
-- [ ] **Gerçek ödeme entegrasyonu** — Şu an checkout sahte (kart bilgisi alıp atıyor).
-
-### Sipariş yönetimi
-- [ ] Sipariş statü akışı: sadece `pending → cancelled`. `shipped`, `delivered` yok.
-- [ ] **Sepet rezervasyonu** (TTL'li) — stok yarışı checkout'ta çözülüyor, sepete ekleme anında değil.
-
-### Yönetim & operasyon
-- [ ] **Admin paneli** — Stok / ürün / sipariş yönetimi şu an DB üzerinden.
-- [ ] **Resim upload** — Tüm ürün görselleri dış URL.
-- [ ] **Test (PHPUnit)** — Demo için kabul edildi, üretime alınırsa gerekli.
-- [ ] **Logging / monitoring** — `error_log()` ötesinde bir altyapı yok.
-
----
-
-## Lisans
-
-Bu repo öğrenim/portföy amaçlıdır. Açık kaynak bir lisans (MIT/Apache-2.0) eklemek istersen `LICENSE` dosyası ekle.
-
-## Katkı
-
-- **Hata bildirimi:** GitHub Issues.
-- **PR:** Lütfen önce issue açın; küçük PR'lar açıklamalı geçişlerle birleştirilir.
+**Brand name in UI:** ZERA (formerly referenced as “STORY” in older assets).
