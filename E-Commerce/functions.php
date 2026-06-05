@@ -1,11 +1,37 @@
 <?php
 // Genel yapılandırma ve ortak fonksiyonlar
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/security/Security.php';
+zera_init_session();
 require_once __DIR__ . "/db.php";
 require_once __DIR__ . "/i18n.php";
+
+/**
+ * @param mixed $raw Comma-separated string or list of product IDs from localStorage wishlist.
+ * @return array<int, int>
+ */
+function parse_favorite_product_ids(mixed $raw): array
+{
+    if (is_array($raw)) {
+        $parts = $raw;
+    } else {
+        $text = trim((string) $raw);
+        if ($text === '') {
+            return [];
+        }
+        $parts = preg_split('/[\s,]+/', $text) ?: [];
+    }
+
+    $ids = [];
+    foreach ($parts as $part) {
+        $id = (int) $part;
+        if ($id > 0) {
+            $ids[$id] = $id;
+        }
+    }
+
+    return array_values($ids);
+}
 
 /**
  * Giriş yapmamış kullanıcıyı reddeder.
@@ -40,6 +66,68 @@ function require_login(): int
     }
     header('Location: ' . $location);
     exit;
+}
+
+function admin_email(): string
+{
+    return strtolower(trim((string) (getenv('ADMIN_EMAIL') ?: '')));
+}
+
+function is_admin_user(): bool
+{
+    $adminEmail = admin_email();
+    if ($adminEmail === '' || empty($_SESSION['user_id'])) {
+        return false;
+    }
+    $sessionEmail = strtolower(trim((string) ($_SESSION['user_email'] ?? '')));
+    return $sessionEmail !== '' && $sessionEmail === $adminEmail;
+}
+
+/**
+ * Yalnızca ADMIN_EMAIL ile eşleşen giriş yapmış kullanıcıya izin verir.
+ */
+function require_admin(): int
+{
+    $userId = require_login();
+    if (!is_admin_user()) {
+        $isJson = (
+            (isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false)
+            || (isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+            || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        );
+        if ($isJson) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => 'Forbidden', 'code' => 'admin_required']);
+            exit;
+        }
+        http_response_code(403);
+        echo 'Forbidden';
+        exit;
+    }
+    return $userId;
+}
+
+function import_products_enabled(): bool
+{
+    return strtolower(trim((string) (getenv('IMPORT_PRODUCTS_ENABLED') ?: 'false'))) === 'true';
+}
+
+/**
+ * import_products.php — varsayılan kapalı (canlı güvenliği).
+ * IMPORT_PRODUCTS_ENABLED=true iken: tarayıcıda admin, CLI'da yalnızca env yeterli.
+ */
+function require_import_products_access(): void
+{
+    if (!import_products_enabled()) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Forbidden: product import is disabled.';
+        exit;
+    }
+    if (PHP_SAPI !== 'cli') {
+        require_admin();
+    }
 }
 
 /**
@@ -389,30 +477,16 @@ function localized_product_description(array $product): string
 function get_product_sizes(array $product): array
 {
     $raw = trim((string) ($product["sizes"] ?? ""));
-    if ($raw !== "") {
-        $parts = preg_split('/[,|\/]+/', $raw) ?: [];
-        $sizes = array_values(array_filter(array_map(static fn($v) => trim((string) $v), $parts), static fn($v) => $v !== ""));
-        if (!empty($sizes)) return array_slice($sizes, 0, 6);
+    if ($raw === "") {
+        return [];
     }
 
-    $nameRaw = (string) ($product["name"] ?? "");
-    $categoryRaw = (string) ($product["category"] ?? "");
-    $name = function_exists("mb_strtolower") ? mb_strtolower($nameRaw, "UTF-8") : strtolower($nameRaw);
-    $category = function_exists("mb_strtolower") ? mb_strtolower($categoryRaw, "UTF-8") : strtolower($categoryRaw);
-    $ctx = $name . " " . $category;
+    $parts = preg_split('/[,|\/]+/', $raw) ?: [];
+    $sizes = array_values(array_filter(
+        array_map(static fn($v) => trim((string) $v), $parts),
+        static fn($v) => $v !== ""
+    ));
 
-    if (preg_match('/\b(shoe|sneaker|ayakkabı|ayakkabi|boots?|sandals?|running)\b/u', $ctx)) {
-        return ["39", "40", "41", "42", "43"];
-    }
-    if (preg_match('/\b(women|kadın|kadin|dress|blouse|skirt|women shoes)\b/u', $ctx)) {
-        return ["XS", "S", "M", "L", "XL"];
-    }
-    if (preg_match('/\b(men|erkek|shirt|pants|jacket|men shoes)\b/u', $ctx)) {
-        return ["S", "M", "L", "XL", "XXL"];
-    }
-    if (preg_match('/\b(kids|çocuk|cocuk|baby|bebek)\b/u', $ctx)) {
-        return ["2-3Y", "4-5Y", "6-7Y", "8-9Y"];
-    }
-    return [];
+    return $sizes === [] ? [] : array_slice($sizes, 0, 12);
 }
 

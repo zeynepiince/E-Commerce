@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "description": "Declarative expectations for auth, OAuth safety, orders, and payments helpers (tools/eval_platform.php).",
+  "auth_return_url": [
+    { "id": "url_01", "input": "", "expect": "index.php" },
+    { "id": "url_02", "input": "//evil.example/phish", "expect": "index.php" },
+    { "id": "url_03", "input": "https://evil.example/phish", "expect": "index.php" },
+    { "id": "url_04", "input": "javascript:alert(1)", "expect": "index.php" },
+    { "id": "url_05", "input": "products.php?cat=shoes", "expect": "products.php?cat=shoes" },
+    { "id": "url_06", "input": "orders.php", "expect": "orders.php" }
+  ],
+  "order_payment_normalize": [
+    { "id": "pay_01", "input": "unpaid", "expect": "awaiting_payment" },
+    { "id": "pay_02", "input": "PAID", "expect": "paid" },
+    { "id": "pay_03", "input": " failed ", "expect": "failed" }
+  ],
+  "order_display_status": [
+    { "id": "disp_01", "fulfillment": "pending", "payment": "awaiting_payment", "expect": "awaiting_payment" },
+    { "id": "disp_02", "fulfillment": "pending", "payment": "failed", "expect": "failed" },
+    { "id": "disp_03", "fulfillment": "pending", "payment": "paid", "expect": "processing" },
+    { "id": "disp_04", "fulfillment": "shipped", "payment": "paid", "expect": "shipped" },
+    { "id": "disp_05", "fulfillment": "delivered", "payment": "paid", "expect": "delivered" }
+  ],
+  "order_transitions": [
+    { "id": "tr_01", "from": "pending", "to": "shipped", "allowed": true },
+    { "id": "tr_02", "from": "pending", "to": "cancelled", "allowed": true },
+    { "id": "tr_03", "from": "pending", "to": "delivered", "allowed": false },
+    { "id": "tr_04", "from": "shipped", "to": "delivered", "allowed": true },
+    { "id": "tr_05", "from": "shipped", "to": "cancelled", "allowed": false },
+    { "id": "tr_06", "from": "delivered", "to": "shipped", "allowed": false }
+  ],
+  "payments_config": [
+    { "id": "iyz_01", "api_key": "", "secret_key": "", "expect_configured": false },
+    { "id": "iyz_02", "api_key": "sandbox-test", "secret_key": "sandbox-secret", "expect_configured": true }
+  ]
+}

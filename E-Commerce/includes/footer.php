@@ -2,7 +2,11 @@
 if (!function_exists("t")) {
   require_once __DIR__ . "/../functions.php";
 }
+require_once __DIR__ . "/../auth/OAuthService.php";
 $appLang = get_current_lang();
+$auth_modal_return = (string) ($_SERVER['REQUEST_URI'] ?? 'index.php');
+$auth_modal_oauth_links = oauth_login_links($auth_modal_return);
+$auth_modal_logged_in = !empty($_SESSION['user_id']);
 ?>
 <footer class="site-footer">
   <div class="footer-inner">
@@ -115,6 +119,7 @@ function toggleFooterInfo(e, id) {
 <div class="cart-backdrop" id="cartBackdrop" onclick="toggleCart()"></div>
 
 <!-- Auth Modal -->
+<?php if (!$auth_modal_logged_in): ?>
 <div class="auth-modal" id="authModal" aria-hidden="true">
   <div class="auth-modal-backdrop" onclick="toggleAuthModal()"></div>
   <div class="auth-modal-dialog" role="dialog" aria-modal="true" aria-label="Sign In or Create Account">
@@ -124,6 +129,7 @@ function toggleFooterInfo(e, id) {
         <button type="button" class="auth-modal-tab active" data-tab="signin"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
         <button type="button" class="auth-modal-tab" data-tab="join"><?= htmlspecialchars(t("auth.join", "Join"), ENT_QUOTES, 'UTF-8') ?></button>
       </div>
+      <div id="auth-modal-message" class="auth-modal-message" role="alert" hidden></div>
       <div class="auth-modal-forms">
         <form id="auth-signin-form" class="auth-modal-form active">
           <div class="auth-input-group">
@@ -144,7 +150,7 @@ function toggleFooterInfo(e, id) {
             </span>
             <input type="password" id="auth-signin-password" name="password" placeholder="<?= htmlspecialchars(t("auth.password", "Password"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="current-password">
           </div>
-          <a href="#" class="auth-forgot-link"><?= htmlspecialchars(t("auth.forgot_password", "Forgot password?"), ENT_QUOTES, 'UTF-8') ?></a>
+          <button type="button" class="auth-forgot-link auth-modal-link" data-switch="forgot"><?= htmlspecialchars(t("auth.forgot_password", "Forgot password?"), ENT_QUOTES, 'UTF-8') ?></button>
           <button type="submit" class="auth-modal-btn"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
           <p class="auth-modal-switch">
             <?= htmlspecialchars(t("auth.no_account", "Don't have an account?"), ENT_QUOTES, 'UTF-8') ?> <button type="button" class="auth-modal-link" data-switch="join"><?= htmlspecialchars(t("auth.join", "Join"), ENT_QUOTES, 'UTF-8') ?></button>
@@ -192,10 +198,35 @@ function toggleFooterInfo(e, id) {
             <?= htmlspecialchars(t("auth.have_account", "Already have an account?"), ENT_QUOTES, 'UTF-8') ?> <button type="button" class="auth-modal-link" data-switch="signin"><?= htmlspecialchars(t("auth.signin", "Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
           </p>
         </form>
+        <form id="auth-forgot-form" class="auth-modal-form auth-modal-form--forgot">
+          <p class="auth-modal-forgot-intro"><?= htmlspecialchars(t("auth.forgot_subtitle", "Enter your email and we will send you a reset link."), ENT_QUOTES, 'UTF-8') ?></p>
+          <div class="auth-input-group">
+            <span class="auth-input-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </span>
+            <input type="email" id="auth-forgot-email" name="email" placeholder="<?= htmlspecialchars(t("auth.email", "Email"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email">
+          </div>
+          <button type="submit" class="auth-modal-btn"><?= htmlspecialchars(t("auth.forgot_submit", "Send reset link"), ENT_QUOTES, 'UTF-8') ?></button>
+          <p class="auth-modal-switch">
+            <button type="button" class="auth-modal-link" data-switch="signin"><?= htmlspecialchars(t("auth.back_signin", "← Back to Sign In"), ENT_QUOTES, 'UTF-8') ?></button>
+          </p>
+        </form>
+      </div>
+      <div id="auth-modal-social">
+      <?php
+        $oauth_links = $auth_modal_oauth_links;
+        $oauth_return = $auth_modal_return;
+        $social_btn_class = 'auth-modal-social-btn';
+        include __DIR__ . '/auth-social.php';
+      ?>
       </div>
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="cart" id="cart">
   <h3><?= htmlspecialchars(t("cart.title", "Your Cart"), ENT_QUOTES, 'UTF-8') ?></h3>
@@ -208,14 +239,62 @@ function toggleFooterInfo(e, id) {
 
 <script>
 window.APP_LANG = <?= json_encode($appLang) ?>;
+window.CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;
+window.csrfHeaders = function (extra) {
+  const headers = Object.assign({}, extra || {});
+  if (window.CSRF_TOKEN) headers["X-CSRF-Token"] = window.CSRF_TOKEN;
+  return headers;
+};
+window.AUTH_I18N = <?= json_encode([
+    'passwords_mismatch' => t('auth.error_passwords_mismatch', 'Passwords do not match.'),
+    'password_min' => t('auth.error_password_min', 'Password must be at least 8 characters.'),
+    'generic_error' => t('auth.error_generic', 'Something went wrong. Please try again.'),
+], JSON_UNESCAPED_UNICODE) ?>;
+window.CHAT_I18N = <?= json_encode([
+    'did_you_mean' => t('chat.did_you_mean', 'Did you mean?'),
+    'feedback_helpful' => t('chat.feedback_helpful', 'Was this helpful?'),
+    'feedback_thanks' => t('chat.feedback_thanks', 'Thanks for your feedback!'),
+    'feedback_error' => t('chat.feedback_error', 'Could not save feedback.'),
+    'feedback_csrf_error' => t('chat.feedback_csrf_error', 'Feedback could not be sent. Please refresh the page and try again.'),
+], JSON_UNESCAPED_UNICODE) ?>;
+window.MAIN_I18N = <?= json_encode([
+    'product.card.seller' => t('product.card.seller', 'ZERA Partner'),
+    'product.card.shipping' => t('product.card.shipping', 'Free shipping'),
+    'product.card.fallback_name' => t('product.card.fallback_name', 'Product'),
+    'product.card.add_to_cart' => t('product.card.add_to_cart', 'Add to Cart'),
+    'product.out_of_stock' => t('product.out_of_stock', 'Out of Stock'),
+    'cart.remove' => t('cart.remove', 'Remove'),
+    'cart.you_save' => t('cart.you_save', 'You save ${amount}'),
+    'cart.added_to_cart' => t('cart.added_to_cart', '{name} added to cart'),
+    'cart.size' => t('cart.size', 'Size'),
+    'cart.total' => t('cart.total', 'Total'),
+    'wishlist.empty_title' => t('wishlist.empty_title', 'Your wishlist is empty'),
+    'wishlist.empty_text' => t('wishlist.empty_text', 'Save items you like by clicking the heart icon on product cards.'),
+    'wishlist.explore_products' => t('wishlist.explore_products', 'Explore Products'),
+    'wishlist.saved_badge' => t('wishlist.saved_badge', 'Saved'),
+    'wishlist.remove' => t('wishlist.remove', 'Remove'),
+    'wishlist.remove_from_wishlist' => t('wishlist.remove_from_wishlist', 'Remove from Wishlist'),
+    'wishlist.item' => t('wishlist.item', 'item'),
+    'wishlist.items' => t('wishlist.items', 'items'),
+    'wishlist.no_favourites_yet' => t('wishlist.no_favourites_yet', 'You have no favourites yet.'),
+    'checkout.cart_empty' => t('checkout.cart_empty', 'Your cart is empty.'),
+    'checkout.continue_shopping' => t('checkout.continue_shopping', 'Continue shopping'),
+    'checkout.price_each' => t('checkout.price_each', '${price} each'),
+    'checkout.subtotal' => t('checkout.subtotal', 'Subtotal'),
+    'checkout.shipping' => t('checkout.shipping', 'Shipping'),
+    'checkout.shipping_free' => t('checkout.shipping_free', 'Free'),
+    'checkout.discount' => t('checkout.discount', 'Discount'),
+    'checkout.discount_none' => t('checkout.discount_none', '—'),
+    'chat.product_view' => t('chat.product_view', 'View'),
+    'chat.product_add' => t('chat.product_add', 'Add'),
+], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
 <script src="assets/js/main.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/main.js')) ?>"></script>
 <?php if (isset($is_homepage) && $is_homepage): ?>
 <script src="assets/js/homepage.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/homepage.js')) ?>"></script>
 <?php endif; ?>
-
-<script src="assets/js/main.js"></script>
+<?php if (!empty($page_footer_scripts)) { echo $page_footer_scripts; } ?>
 </body>
 </html>
 

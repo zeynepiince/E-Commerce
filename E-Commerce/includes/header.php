@@ -92,9 +92,12 @@ $loggedInName = $_SESSION['user_name'] ?? null;
     </button>
     <?php if ($loggedInName): ?>
       <a href="<?= htmlspecialchars(localized_path('profile.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action"><?= htmlspecialchars(t("nav.hi", "Hi"), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars($loggedInName, ENT_QUOTES, 'UTF-8') ?></a>
+      <?php if (function_exists('is_admin_user') && is_admin_user()): ?>
+        <a href="<?= htmlspecialchars(localized_path('admin_orders.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action"><?= htmlspecialchars(t("nav.admin_orders", "Manage orders"), ENT_QUOTES, 'UTF-8') ?></a>
+      <?php endif; ?>
       <a href="<?= htmlspecialchars(localized_path('logout.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action"><?= htmlspecialchars(t("nav.logout", "Log out"), ENT_QUOTES, 'UTF-8') ?></a>
     <?php else: ?>
-      <a href="<?= htmlspecialchars(localized_path('auth.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-action highlight"><?= htmlspecialchars(t("nav.signin_join", "Sign In / Join"), ENT_QUOTES, 'UTF-8') ?></a>
+      <button type="button" class="nav-action highlight nav-action--btn" onclick="toggleAuthModal()"><?= htmlspecialchars(t("nav.signin_join", "Sign In / Join"), ENT_QUOTES, 'UTF-8') ?></button>
     <?php endif; ?>
   </div>
 </header>

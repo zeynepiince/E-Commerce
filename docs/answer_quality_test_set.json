@@ -1,0 +1,119 @@
+{
+  "version": "1.0",
+  "description": "Grounding and guardrail probes for answer-quality evaluation.",
+  "guardrail_cases": [
+    {
+      "id": "gr_01",
+      "label": "hallucinated price on shipping intent",
+      "reply": "Shipping costs $49.99 and your order #999 will arrive tomorrow.",
+      "intent": "shipping",
+      "products": [],
+      "expect_accepted": false,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_02",
+      "label": "hallucinated stock on returns intent",
+      "reply": "You can return items within 30 days. The blue jacket is in stock with 50 units.",
+      "intent": "returns",
+      "products": [],
+      "expect_accepted": false,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_03",
+      "label": "fabricated product price",
+      "reply": "Here is a great deal: iPhone 15 Pro for $1.00 only today!",
+      "intent": "product_search",
+      "products": [{"name": "Men Check Shirt", "price": 27.99, "category": "men's clothing"}],
+      "expect_accepted": false,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_04",
+      "label": "valid grounded product price",
+      "reply": "Men Check Shirt is available for $27.99.",
+      "intent": "product_search",
+      "products": [{"name": "Men Check Shirt", "price": 27.99, "category": "men's clothing"}],
+      "expect_accepted": true,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_05",
+      "label": "valid policy-style shipping answer",
+      "reply": "Shipping usually takes 2-4 business days. During busy periods, delivery may take longer.",
+      "intent": "shipping",
+      "products": [],
+      "expect_accepted": true,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_06",
+      "label": "hedging language rejected by strict guardrail",
+      "reply": "I think shipping probably takes maybe 3 days.",
+      "intent": "shipping",
+      "products": [],
+      "expect_accepted": false,
+      "guardrail": "strict"
+    },
+    {
+      "id": "gr_07",
+      "label": "concise grounded answer passes strict",
+      "reply": "Most orders arrive within 2-4 business days. Check the Orders page for details.",
+      "intent": "shipping",
+      "products": [],
+      "expect_accepted": true,
+      "guardrail": "strict"
+    },
+    {
+      "id": "gr_08",
+      "label": "policy intent with fabricated fee",
+      "reply": "Standard shipping is $12.99 per item and express shipping is $39.99 for all customers.",
+      "intent": "shipping",
+      "products": [],
+      "expect_accepted": false,
+      "guardrail": "normal"
+    },
+    {
+      "id": "gr_09",
+      "label": "product recommendation on shipping intent",
+      "reply": "Shipping takes 2-4 days. Sana uygun olabilecek seçenekler:\n- Running Sneakers ($89.00)",
+      "intent": "shipping",
+      "products": [{"name": "Running Sneakers", "price": 89.0, "category": "men's shoes"}],
+      "expect_accepted": false,
+      "guardrail": "normal"
+    }
+  ],
+  "policy_probes": [
+    {"id": "pol_01", "user": "what is your return policy", "lang": "en", "intent": "returns"},
+    {"id": "pol_02", "user": "iade koşulları neler", "lang": "tr", "intent": "returns"},
+    {"id": "pol_03", "user": "how long does shipping take", "lang": "en", "intent": "shipping"},
+    {"id": "pol_04", "user": "kargo ne kadar sürer", "lang": "tr", "intent": "shipping"},
+    {"id": "pol_05", "user": "what payment methods do you accept", "lang": "en", "intent": "payment"},
+    {"id": "pol_06", "user": "ödeme yöntemleri neler", "lang": "tr", "intent": "payment"}
+  ],
+  "consistency_probes": [
+    {"id": "con_01", "user": "kargo ne kadar sürer", "lang": "tr", "expect_intent": "shipping", "expect_no_product_list": true, "expect_no_suggested_products": true},
+    {"id": "con_02", "user": "iade koşulları neler", "lang": "tr", "expect_intent": "returns", "expect_no_product_list": true},
+    {"id": "con_03", "user": "10 euro altında erkek tişörtü", "lang": "tr", "expect_intent": "product_search", "expect_reply_contains": ["bulamadım"], "expect_max_suggested_price": 10.8},
+    {"id": "con_04", "user": "kadın tişörtü sadece", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["bag", "bracelet", "clutch", "wallet"]},
+    {"id": "con_05", "user": "mutfak eşyası öner", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Cleats", "Sneakers", "Loafers"]},
+    {"id": "con_06", "user": "etek", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["etek bulamadım"]},
+    {"id": "con_07", "user": "elbise", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["elbise bulamadım"]},
+    {"id": "con_08", "user": "bedeni S olan kadın tişörleri", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Backpack", "Bag", "Bracelet", "Desk Lamp"]},
+    {"id": "con_09", "user": "kitap öner", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["kitap bulamadım"]},
+    {"id": "con_10", "user": "kamera öner", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["kamera bulamadım"]},
+    {"id": "con_11", "user": "erkek tişörtü", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Women", "Womens", "Backpack"]},
+    {"id": "con_12", "user": "koşu ayakkabısı", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Wok", "Desk Lamp", "Strainer"]},
+    {"id": "con_13", "user": "ceket öner", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Desk Lamp", "Cleats", "Espresso"]},
+    {"id": "con_14", "user": "50 tl altında kulaklık", "lang": "tr", "expect_intent": "product_search", "expect_max_suggested_price": 1.6},
+    {"id": "con_15", "user": "100 dolar altında ayakkabı", "lang": "tr", "expect_intent": "product_search", "expect_max_suggested_price": 100},
+    {"id": "con_16", "user": "erkek spor ayakkabı öner", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Women", "Womens", "Desk Lamp", "Wok"]},
+    {"id": "con_17", "user": "50 euro altında ayakkabı", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["bulamadım"]},
+    {"id": "con_18", "user": "nike ayakkabı öner", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Puma", "Adidas", "Desk Lamp"]},
+    {"id": "con_19", "user": "en ucuz ayakkabı", "lang": "tr", "expect_intent": "product_search", "reject_suggested_name_contains": ["Desk Lamp", "Espresso"]},
+    {"id": "con_20", "user": "200 dolar altında sneaker", "lang": "tr", "expect_intent": "product_search", "expect_max_suggested_price": 200},
+    {"id": "con_21", "user": "30 dolar altında erkek ayakkabı", "lang": "tr", "expect_intent": "product_search", "expect_no_suggested_products": true, "expect_reply_contains": ["bulamadım"]},
+    {"id": "con_22", "user": "show sneakers under 120 dollars", "lang": "en", "expect_intent": "product_search", "expect_max_suggested_price": 120, "reject_suggested_name_contains": ["Desk Lamp", "Wok"]}
+  ]
+}

@@ -8,7 +8,8 @@ $is_homepage = true;
 $featuredProducts   = get_featured_products($pdo);
 
 $userIdForRecommendations = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : 0;
-$forYouProducts = get_ai_recommendations($pdo, $userIdForRecommendations, 4);
+$favoriteIdsForRecommendations = parse_favorite_product_ids($_COOKIE['zera_fav_ids'] ?? '');
+$forYouProducts = get_ai_recommendations($pdo, $userIdForRecommendations, 4, $favoriteIdsForRecommendations);
 
 
 $bestSellerProducts = get_random_products($pdo, 4);
@@ -288,7 +289,7 @@ $selectedCategory = $_GET['category'] ?? '';
     <div>
       <div class="ai-section-kicker">
         <span class="ai-spark">✨</span>
-        <span>AI-powered picks</span>
+        <span><?= htmlspecialchars(t("home.ai_powered_picks", "AI-powered picks"), ENT_QUOTES, 'UTF-8') ?></span>
       </div>
 
       <h3><?= htmlspecialchars(t("home.recommended_for_you", "Recommended for you"), ENT_QUOTES, 'UTF-8') ?></h3>
@@ -298,10 +299,10 @@ $selectedCategory = $_GET['category'] ?? '';
       </p>
     </div>
 
-    <span class="ai-badge">AI Recommended</span>
+    <span class="ai-badge"><?= htmlspecialchars(t("home.ai_recommended_badge", "AI Recommended"), ENT_QUOTES, 'UTF-8') ?></span>
   </div>
 
-  <div class="featured-grid featured-grid--product-cards">
+  <div class="featured-grid featured-grid--product-cards" id="ai-recommended-grid">
     <?php foreach ($forYouProducts as $idx => $product): ?>
       <?php $badges = get_product_badges($product, 'recommended', $idx); ?>
       <?php include 'includes/product_card.php'; ?>
@@ -494,10 +495,11 @@ $selectedCategory = $_GET['category'] ?? '';
     <div class="info-col">
       <h4><?= htmlspecialchars(t("home.newsletter_title", "Stay in the loop"), ENT_QUOTES, 'UTF-8') ?></h4>
       <p style="font-size:13px;color:#6b7280;"><?= htmlspecialchars(t("home.newsletter_sub", "Be the first to know about new drops and limited deals."), ENT_QUOTES, 'UTF-8') ?></p>
-      <form onsubmit="event.preventDefault();" class="newsletter-form">
-        <input type="email" placeholder="<?= htmlspecialchars(t("home.newsletter_placeholder", "Enter your email"), ENT_QUOTES, 'UTF-8') ?>" required />
-        <button type="submit"><?= htmlspecialchars(t("home.newsletter_cta", "Join newsletter"), ENT_QUOTES, 'UTF-8') ?></button>
+      <form id="homeNewsletterForm" class="newsletter-form" novalidate>
+        <input type="email" id="homeNewsletterEmail" name="email" placeholder="<?= htmlspecialchars(t("home.newsletter_placeholder", "Enter your email"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email" />
+        <button type="submit" id="homeNewsletterBtn"><?= htmlspecialchars(t("home.newsletter_cta", "Join newsletter"), ENT_QUOTES, 'UTF-8') ?></button>
       </form>
+      <p id="homeNewsletterMessage" class="newsletter-message" role="alert" hidden></p>
     </div>
   </div>
 </section>

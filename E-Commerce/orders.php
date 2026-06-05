@@ -1,10 +1,14 @@
 <?php
 require_once 'functions.php';
+require_once __DIR__ . '/orders/OrderStatusService.php';
+require_once __DIR__ . '/orders/TrackingService.php';
 
 $user_id = require_login();
+ensure_order_fulfillment_columns($pdo);
 
 $stmt = $pdo->prepare("
-  SELECT order_id AS id, total_amount, status, created_at
+  SELECT order_id AS id, total_amount, status, payment_status, tracking_number, carrier,
+         shipped_at, delivered_at, created_at
   FROM orders
   WHERE user_id = ?
   ORDER BY created_at DESC
@@ -46,6 +50,23 @@ if ($orders) {
 }
 
 $page_title = t("meta.orders_title", "ZERA - Orders");
+$is_orders = true;
+$page_footer_scripts = '<script>
+window.ORDERS_I18N = ' . json_encode([
+    'viewDetails' => t('orders.view_details', 'View details'),
+    'hideDetails' => t('orders.hide_details', 'Hide details'),
+    'trackOrder' => t('orders.track_order', 'Track order'),
+    'hideTracking' => t('orders.hide_tracking', 'Hide tracking'),
+    'cancelling' => t('orders.cancelling', 'Cancelling...'),
+    'cancelOrder' => t('orders.cancel_order', 'Cancel order'),
+    'cancelConfirm' => t('orders.cancel_confirm', 'Do you want to cancel this order?'),
+    'cancelFailed' => t('orders.cancel_failed', 'Order could not be cancelled.'),
+    'cancelled' => t('orders.status.cancelled', 'Cancelled'),
+    'reorderEmpty' => t('orders.reorder_empty', 'No items to reorder.'),
+    'reorderAdded' => t('orders.reorder_added', 'Items added to cart.'),
+], JSON_UNESCAPED_UNICODE) . ';
+</script>
+<script src="assets/js/orders.js?v=' . urlencode((string) @filemtime(__DIR__ . '/assets/js/orders.js')) . '"></script>';
 ?>
 <?php include 'includes/header.php'; ?>
 
@@ -73,6 +94,16 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
     <header class="orders-header">
       <h1 class="orders-title"><?= htmlspecialchars(t("orders.title", "Your Orders"), ENT_QUOTES, 'UTF-8') ?></h1>
       <p class="orders-subtitle"><?= htmlspecialchars(t("orders.subtitle", "Track and manage your recent orders"), ENT_QUOTES, 'UTF-8') ?></p>
+      <?php
+        $paymentFlash = (string) ($_GET['payment'] ?? '');
+        if ($paymentFlash === 'success') {
+            echo '<p class="orders-flash orders-flash--success">' . htmlspecialchars(t('orders.payment.success', 'Your payment was successful.'), ENT_QUOTES, 'UTF-8') . '</p>';
+        } elseif ($paymentFlash === 'failed') {
+            echo '<p class="orders-flash orders-flash--failed">' . htmlspecialchars(t('orders.payment.failed', 'Payment could not be completed.'), ENT_QUOTES, 'UTF-8') . '</p>';
+        } elseif ($paymentFlash === 'error') {
+            echo '<p class="orders-flash orders-flash--failed">' . htmlspecialchars(t('orders.payment.error', 'Payment verification error.'), ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+      ?>
     </header>
 
     <div class="orders-status-legend">
@@ -87,6 +118,8 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
         <label for="orders-filter-status"><?= htmlspecialchars(t("orders.filter", "Filter"), ENT_QUOTES, 'UTF-8') ?>:</label>
         <select id="orders-filter-status" class="orders-select">
           <option value=""><?= htmlspecialchars(t("orders.all_statuses", "All statuses"), ENT_QUOTES, 'UTF-8') ?></option>
+          <option value="processing"><?= htmlspecialchars(t("orders.status.processing", "Processing"), ENT_QUOTES, 'UTF-8') ?></option>
+          <option value="awaiting_payment"><?= htmlspecialchars(t("orders.status.awaiting_payment", "Awaiting payment"), ENT_QUOTES, 'UTF-8') ?></option>
           <option value="pending"><?= htmlspecialchars(t("orders.status.pending", "Pending"), ENT_QUOTES, 'UTF-8') ?></option>
           <option value="shipped"><?= htmlspecialchars(t("orders.status.shipped", "Shipped"), ENT_QUOTES, 'UTF-8') ?></option>
           <option value="delivered"><?= htmlspecialchars(t("orders.status.delivered", "Delivered"), ENT_QUOTES, 'UTF-8') ?></option>
@@ -109,12 +142,24 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
         <?php foreach ($orders as $order): ?>
           <?php
             $status = $order['status'] ?? 'pending';
+            $paymentStatus = normalize_order_payment_status((string) ($order['payment_status'] ?? 'paid'));
             $statusClass = 'orders-card--' . $status;
+            $statusKey = resolve_order_display_status_key((string) $status, (string) ($order['payment_status'] ?? 'paid'));
             $oid = (int) $order['id'];
             $items = $orderItemsByOrder[$oid] ?? [];
             $itemCount = count($items);
+            $reorderItems = array_map(static function (array $item): array {
+                return [
+                    'product_id' => (int) ($item['product_id'] ?? 0),
+                    'name' => (string) ($item['name'] ?? 'Product'),
+                    'quantity' => (int) ($item['quantity'] ?? 1),
+                    'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    'image_url' => (string) ($item['image_url'] ?? ''),
+                ];
+            }, $items);
+            $canCancel = $status === 'pending' && in_array($paymentStatus, ['awaiting_payment', 'failed', 'paid'], true);
           ?>
-          <article class="orders-card <?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>" data-order-id="<?= $oid ?>" data-status="<?= htmlspecialchars($status, ENT_QUOTES, 'UTF-8') ?>" data-total="<?= htmlspecialchars($order['total_amount'], ENT_QUOTES, 'UTF-8') ?>" data-date="<?= htmlspecialchars($order['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+          <article class="orders-card <?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>" data-order-id="<?= $oid ?>" data-status="<?= htmlspecialchars($status, ENT_QUOTES, 'UTF-8') ?>" data-display-status="<?= htmlspecialchars($statusKey, ENT_QUOTES, 'UTF-8') ?>" data-payment-status="<?= htmlspecialchars($paymentStatus, ENT_QUOTES, 'UTF-8') ?>" data-total="<?= htmlspecialchars($order['total_amount'], ENT_QUOTES, 'UTF-8') ?>" data-date="<?= htmlspecialchars($order['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-order-items="<?= htmlspecialchars(json_encode($reorderItems, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
             <div class="orders-card-header">
               <div class="orders-card-summary">
                 <h3 class="orders-card-id"><?= htmlspecialchars(t("orders.order", "Order"), ENT_QUOTES, 'UTF-8') ?> #<?= htmlspecialchars($order['id'], ENT_QUOTES, 'UTF-8') ?></h3>
@@ -123,7 +168,7 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
                   <span class="orders-card-total">$<?= htmlspecialchars($order['total_amount'] ?? '0', ENT_QUOTES, 'UTF-8') ?></span>
                 </div>
               </div>
-              <span class="orders-card-status orders-status--<?= htmlspecialchars($status, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t("orders.status." . $status, ucfirst($status)), ENT_QUOTES, 'UTF-8') ?></span>
+              <span class="orders-card-status orders-status--<?= htmlspecialchars($statusKey, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('orders.status.' . $statusKey, ucfirst($statusKey)), ENT_QUOTES, 'UTF-8') ?></span>
             </div>
 
             <?php if (!empty($items)): ?>
@@ -137,7 +182,28 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
               </div>
             <?php endif; ?>
 
-            <div class="orders-card-details" id="order-details-<?= $oid ?>">
+            <div class="orders-card-actions">
+              <button type="button" class="orders-btn orders-btn--primary orders-btn-details" data-order="<?= $oid ?>" data-action="details">
+                <?= htmlspecialchars(t("orders.view_details", "View details"), ENT_QUOTES, 'UTF-8') ?>
+              </button>
+              <?php if ($status !== 'cancelled' && $status !== 'delivered'): ?>
+                <button type="button" class="orders-btn orders-btn--secondary orders-btn-track" data-order="<?= $oid ?>" data-action="track">
+                  <?= htmlspecialchars(t("orders.track_order", "Track order"), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+              <?php endif; ?>
+              <?php if ($canCancel): ?>
+                <button type="button" class="orders-btn orders-btn--outline orders-btn-cancel" data-order="<?= $oid ?>" data-action="cancel">
+                  <?= htmlspecialchars(t("orders.cancel_order", "Cancel order"), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+              <?php endif; ?>
+              <?php if (!empty($reorderItems)): ?>
+                <button type="button" class="orders-btn orders-btn--outline orders-btn-reorder" data-order="<?= $oid ?>" data-action="reorder">
+                  <?= htmlspecialchars(t("orders.reorder", "Reorder"), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+              <?php endif; ?>
+            </div>
+
+            <div class="orders-card-details" id="order-details-<?= $oid ?>" hidden>
               <div class="orders-details-inner">
                 <?php if ($items): ?>
                   <h4 class="orders-details-title"><?= htmlspecialchars(t("orders.items", "Order items"), ENT_QUOTES, 'UTF-8') ?></h4>
@@ -173,30 +239,72 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
               </div>
             </div>
 
-            <div class="orders-card-details" id="order-tracking-<?= $oid ?>">
+            <?php
+              $trackingTimeline = build_order_tracking_timeline($order, get_current_lang());
+              $trackingNumber = trim((string) ($order['tracking_number'] ?? ''));
+              $trackingUrl = tracking_external_url((string) ($order['carrier'] ?? ''), $trackingNumber);
+              $etaDate = estimate_delivery_date($order);
+            ?>
+            <div class="orders-card-details" id="order-tracking-<?= $oid ?>" hidden>
               <div class="orders-details-inner">
                 <h4 class="orders-details-title"><?= htmlspecialchars(t("orders.tracking_title", "Tracking"), ENT_QUOTES, 'UTF-8') ?></h4>
-                <p class="orders-no-items"><?= htmlspecialchars(t("orders.track_info_alert", "Tracking info will appear here once shipped."), ENT_QUOTES, 'UTF-8') ?></p>
-              </div>
-            </div>
 
-            <div class="orders-card-actions">
-              <button type="button" class="orders-btn orders-btn--primary orders-btn-details" data-order="<?= $oid ?>" onclick="orderToggleDetails('<?= $oid ?>', this)">
-                <?= htmlspecialchars(t("orders.view_details", "View details"), ENT_QUOTES, 'UTF-8') ?>
-              </button>
-              <?php if ($status !== 'cancelled' && $status !== 'delivered'): ?>
-                <button type="button" class="orders-btn orders-btn--secondary orders-btn-track" data-order="<?= $oid ?>" onclick="orderToggleTracking('<?= $oid ?>', this)">
-                  <?= htmlspecialchars(t("orders.track_order", "Track order"), ENT_QUOTES, 'UTF-8') ?>
-                </button>
-              <?php endif; ?>
-              <?php if ($status === 'pending'): ?>
-                <button type="button" class="orders-btn orders-btn--outline orders-btn-cancel" data-order="<?= $oid ?>" onclick="orderCancel('<?= $oid ?>', this)">
-                  <?= htmlspecialchars(t("orders.cancel_order", "Cancel order"), ENT_QUOTES, 'UTF-8') ?>
-                </button>
-              <?php endif; ?>
-              <button type="button" class="orders-btn orders-btn--outline" onclick="window.location.href='<?= htmlspecialchars(localized_path('products.php'), ENT_QUOTES, 'UTF-8') ?>'">
-                <?= htmlspecialchars(t("orders.reorder", "Reorder"), ENT_QUOTES, 'UTF-8') ?>
-              </button>
+                <div class="orders-tracking-timeline">
+                  <?php foreach ($trackingTimeline as $step): ?>
+                    <?php
+                      $stepClass = 'orders-tracking-step';
+                      if (!empty($step['done'])) {
+                          $stepClass .= ' orders-tracking-step--done';
+                      }
+                      if (!empty($step['active'])) {
+                          $stepClass .= ' orders-tracking-step--active';
+                      }
+                    ?>
+                    <div class="<?= htmlspecialchars($stepClass, ENT_QUOTES, 'UTF-8') ?>">
+                      <span class="orders-tracking-label"><?= htmlspecialchars(t($step['label_key'], $step['key']), ENT_QUOTES, 'UTF-8') ?></span>
+                      <?php if (!empty($step['date'])): ?>
+                        <span class="orders-tracking-date"><?= htmlspecialchars((string) $step['date'], ENT_QUOTES, 'UTF-8') ?></span>
+                      <?php endif; ?>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+
+                <?php if ($etaDate && $status !== 'delivered' && $status !== 'cancelled'): ?>
+                  <p class="orders-tracking-eta">
+                    <?= htmlspecialchars(t('orders.tracking_eta', 'Estimated delivery'), ENT_QUOTES, 'UTF-8') ?>:
+                    <strong><?= htmlspecialchars($etaDate, ENT_QUOTES, 'UTF-8') ?></strong>
+                  </p>
+                <?php endif; ?>
+
+                <?php if ($trackingNumber !== ''): ?>
+                  <div class="orders-tracking-box">
+                    <p class="orders-tracking-number">
+                      <?= htmlspecialchars(t('orders.tracking_number', 'Tracking number'), ENT_QUOTES, 'UTF-8') ?>:
+                      <strong id="tracking-num-<?= $oid ?>"><?= htmlspecialchars($trackingNumber, ENT_QUOTES, 'UTF-8') ?></strong>
+                    </p>
+                    <?php if (!empty($order['carrier'])): ?>
+                      <p class="orders-tracking-carrier">
+                        <?= htmlspecialchars(t('orders.carrier', 'Carrier'), ENT_QUOTES, 'UTF-8') ?>:
+                        <?= htmlspecialchars((string) $order['carrier'], ENT_QUOTES, 'UTF-8') ?>
+                      </p>
+                    <?php endif; ?>
+                    <div class="orders-tracking-actions">
+                      <button type="button" class="orders-btn orders-btn--outline orders-btn-copy-tracking" data-copy-target="tracking-num-<?= $oid ?>">
+                        <?= htmlspecialchars(t('orders.copy_tracking', 'Copy number'), ENT_QUOTES, 'UTF-8') ?>
+                      </button>
+                      <?php if ($trackingUrl): ?>
+                        <a href="<?= htmlspecialchars($trackingUrl, ENT_QUOTES, 'UTF-8') ?>" class="orders-btn orders-btn--secondary" target="_blank" rel="noopener noreferrer">
+                          <?= htmlspecialchars(t('orders.track_external', 'Track on carrier site'), ENT_QUOTES, 'UTF-8') ?>
+                        </a>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                <?php elseif ($paymentStatus === 'paid' && $status === 'pending'): ?>
+                  <p class="orders-tracking-hint"><?= htmlspecialchars(t('orders.track_preparing', 'Your order is being prepared for shipment.'), ENT_QUOTES, 'UTF-8') ?></p>
+                <?php elseif ($paymentStatus === 'awaiting_payment'): ?>
+                  <p class="orders-tracking-hint"><?= htmlspecialchars(t('orders.track_awaiting_payment', 'Tracking will be available after payment is completed.'), ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
+              </div>
             </div>
           </article>
         <?php endforeach; ?>
@@ -210,5 +318,4 @@ $page_title = t("meta.orders_title", "ZERA - Orders");
   </main>
 </div>
 
-<script src="assets/js/orders.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/assets/js/orders.js')) ?>"></script>
 <?php include 'includes/footer.php'; ?>

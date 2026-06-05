@@ -19,3 +19,5 @@ npm-debug.log*
 # Composer / Node (if used later)
 vendor/
 node_modules/
+composer-setup.php
+composer.phar

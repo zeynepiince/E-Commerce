@@ -388,18 +388,46 @@ body {
 }
 
 /* Forgot link */
-.forgot-link {
+.forgot-link,
+button.forgot-link {
   display: block;
   font-size: 14px;
   color: var(--auth-accent);
   text-decoration: none;
   margin-bottom: 22px;
   transition: color var(--auth-transition);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
 }
 
 .forgot-link:hover {
   color: var(--auth-accent-hover);
   text-decoration: underline;
+}
+
+.auth-form--forgot {
+  opacity: 0;
+  visibility: hidden;
+  position: absolute;
+  pointer-events: none;
+}
+
+.auth-form--forgot.active {
+  opacity: 1;
+  visibility: visible;
+  position: relative;
+  pointer-events: auto;
+}
+
+.auth-forgot-intro {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--auth-text-muted);
 }
 
 /* Submit button */
@@ -496,6 +524,17 @@ body {
 
 .auth-social-btn:disabled {
   cursor: not-allowed;
+}
+
+.auth-social-btn--link {
+  text-decoration: none;
+  opacity: 1;
+}
+
+.auth-social-btn--link:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: var(--auth-text);
 }
 
 /* Responsive */

@@ -184,11 +184,24 @@
   text-decoration: none;
   margin-bottom: 18px;
   transition: color 0.2s;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
 }
 
 .auth-forgot-link:hover {
   color: #e65c00;
   text-decoration: underline;
+}
+
+.auth-modal-forgot-intro {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6b7280;
 }
 
 .auth-modal-btn {
@@ -233,6 +246,63 @@
 .auth-modal-link:hover {
   color: #e65c00;
   text-decoration: underline;
+}
+
+.auth-modal-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.auth-modal-message--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.auth-modal-message--success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.auth-modal-content .auth-social {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.auth-modal-social-btn,
+.auth-modal-content .auth-social-btn--link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.auth-modal-social-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.auth-modal-content .auth-social-btn--link:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #111827;
 }
 
 @media (max-width: 480px) {

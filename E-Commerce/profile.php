@@ -1,8 +1,10 @@
 <?php
 require_once 'functions.php';
+require_once __DIR__ . '/newsletter/NewsletterService.php';
 
 $userId = require_login();
-$stmt = $pdo->prepare("SELECT user_id, full_name, email, password_hash, created_at FROM users WHERE user_id = ?");
+newsletter_ensure_schema($pdo);
+$stmt = $pdo->prepare("SELECT user_id, full_name, email, password_hash, created_at, newsletter_opt_in, email_notifications FROM users WHERE user_id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
@@ -63,19 +65,27 @@ $passwordMessage = '';
 $settingsMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_require(false);
     $action = $_POST['action'] ?? '';
 
     if ($action === 'profile') {
-        $name = trim($_POST['name'] ?? '');
+        $name = trim($_POST['full_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
 
-        if ($name !== '' && $email !== '') {
-            $update = $pdo->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
-            $update->execute([$name, $email, $userId]);
-            $profileMessage = t('profile.msg.updated', 'Profile updated successfully.');
-            $user['name'] = $name;
-            $user['email'] = $email;
-            $_SESSION['user_name'] = $name;
+        if ($name !== '' && $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $dup = $pdo->prepare('SELECT user_id FROM users WHERE email = ? AND user_id <> ? LIMIT 1');
+            $dup->execute([$email, $userId]);
+            if ($dup->fetch()) {
+                $profileMessage = t('auth.error_email_exists', 'An account with this email already exists.');
+            } else {
+                $update = $pdo->prepare('UPDATE users SET full_name = ?, email = ? WHERE user_id = ?');
+                $update->execute([$name, $email, $userId]);
+                $profileMessage = t('profile.msg.updated', 'Profile updated successfully.');
+                $user['full_name'] = $name;
+                $user['email'] = $email;
+                $_SESSION['user_name'] = $name;
+                $_SESSION['user_email'] = $email;
+            }
         } else {
             $profileMessage = t('profile.msg.name_email_required', 'Name and email are required.');
         }
@@ -97,17 +107,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $passwordMessage = t('profile.msg.current_password_wrong', 'Current password is incorrect.');
             } else {
                 $hash = password_hash($new, PASSWORD_DEFAULT);
-                $update = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+                $update = $pdo->prepare('UPDATE users SET password_hash = ? WHERE user_id = ?');
                 $update->execute([$hash, $userId]);
                 $passwordMessage = t('profile.msg.password_updated', 'Password updated successfully.');
                 $user['password_hash'] = $hash;
             }
         }
     } elseif ($action === 'settings') {
+        $emailNotifications = !empty($_POST['email_notifications']);
+        $newsletterOptIn = !empty($_POST['newsletter']);
+        newsletter_save_user_preferences($pdo, $userId, $emailNotifications, $newsletterOptIn);
+        $user['email_notifications'] = $emailNotifications ? 1 : 0;
+        $user['newsletter_opt_in'] = $newsletterOptIn ? 1 : 0;
         $settingsMessage = t('profile.msg.preferences_saved', 'Preferences saved.');
     }
 }
 
+$emailNotificationsOn = (bool) ((int) ($user['email_notifications'] ?? 1));
+$newsletterOn = (bool) ((int) ($user['newsletter_opt_in'] ?? 0));
 $membershipDate = isset($user['created_at']) ? date('F j, Y', strtotime($user['created_at'])) : t('profile.member', 'Member');
 
 $page_title = t("meta.profile_title", "ZERA - Profile");
@@ -160,6 +177,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
           <div class="profile-message profile-message--success"><?= htmlspecialchars($profileMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <form method="post" class="profile-form">
+          <?= csrf_field_html() ?>
           <input type="hidden" name="action" value="profile">
           <div class="profile-field">
             <label for="profile-name"><?= htmlspecialchars(t('profile.full_name', 'Full Name'), ENT_QUOTES, 'UTF-8') ?></label>
@@ -179,6 +197,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
           <div class="profile-message profile-message--success"><?= htmlspecialchars($passwordMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <form method="post" class="profile-form">
+          <?= csrf_field_html() ?>
           <input type="hidden" name="action" value="password">
           <div class="profile-field">
             <label for="current_password"><?= htmlspecialchars(t('profile.current_password', 'Current password'), ENT_QUOTES, 'UTF-8') ?></label>
@@ -255,6 +274,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
           <div class="profile-message profile-message--success"><?= htmlspecialchars($settingsMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <form method="post" class="profile-settings-form">
+          <?= csrf_field_html() ?>
           <input type="hidden" name="action" value="settings">
           <div class="profile-setting-row">
             <div>
@@ -262,7 +282,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
               <p class="profile-setting-desc"><?= htmlspecialchars(t('profile.email_notifications_desc', 'Receive order updates and promotions'), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <label class="profile-toggle">
-              <input type="checkbox" name="email_notifications" value="1" checked>
+              <input type="checkbox" name="email_notifications" value="1" <?= $emailNotificationsOn ? 'checked' : '' ?>>
               <span class="profile-toggle-slider"></span>
             </label>
           </div>
@@ -272,7 +292,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
               <p class="profile-setting-desc"><?= htmlspecialchars(t('profile.newsletter_desc', 'Weekly deals and new arrivals'), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <label class="profile-toggle">
-              <input type="checkbox" name="newsletter" value="1">
+              <input type="checkbox" name="newsletter" value="1" <?= $newsletterOn ? 'checked' : '' ?>>
               <span class="profile-toggle-slider"></span>
             </label>
           </div>

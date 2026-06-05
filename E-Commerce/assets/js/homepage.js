@@ -84,9 +84,73 @@
     });
   }
 
+  function initNewsletterForm() {
+    const form = document.getElementById('homeNewsletterForm');
+    const emailInput = document.getElementById('homeNewsletterEmail');
+    const messageEl = document.getElementById('homeNewsletterMessage');
+    const submitBtn = document.getElementById('homeNewsletterBtn');
+    if (!form || !emailInput || !messageEl) return;
+
+    function showMessage(text, type) {
+      const message = String(text || '').trim();
+      if (!message) {
+        messageEl.hidden = true;
+        messageEl.textContent = '';
+        messageEl.className = 'newsletter-message';
+        return;
+      }
+      messageEl.hidden = false;
+      messageEl.textContent = message;
+      messageEl.className = `newsletter-message newsletter-message--${type === 'success' ? 'success' : 'error'}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = String(emailInput.value || '').trim();
+      if (!email) return;
+
+      if (submitBtn) submitBtn.disabled = true;
+      showMessage('', '');
+
+      try {
+        const url = new URL('newsletter_api.php', window.location.href);
+        const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG : '';
+        if (lang) url.searchParams.set('lang', lang);
+
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: (typeof window.csrfHeaders === 'function'
+            ? window.csrfHeaders({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              })
+            : {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
+          credentials: 'same-origin',
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (data.success) {
+          showMessage(data.message || '', 'success');
+          form.reset();
+        } else {
+          showMessage(data.message || 'Something went wrong.', 'error');
+        }
+      } catch (err) {
+        showMessage('Something went wrong.', 'error');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initHomeHero();
     initHomeFlashCountdown();
     initScrollAnimations();
+    initNewsletterForm();
   });
 })();

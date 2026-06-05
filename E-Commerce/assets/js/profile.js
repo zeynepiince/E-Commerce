@@ -51,7 +51,9 @@
 
     let favorites = [];
     try {
-      const saved = localStorage.getItem('story_favorites');
+      const saved = typeof window.zeraStorageGet === 'function'
+        ? window.zeraStorageGet('favorites')
+        : localStorage.getItem('zera_favorites') || localStorage.getItem('story_favorites');
       if (saved) {
         favorites = JSON.parse(saved);
       }
@@ -78,8 +80,8 @@
           <h4>${(f.name || 'Product').replace(/</g, '&lt;')}</h4>
           ${priceDisplay ? '<p class="price">' + priceDisplay + '</p>' : ''}
           <div class="profile-wishlist-actions">
-            <button type="button" class="profile-wishlist-add" onclick="addFavoriteToCart(${f.id})">Add to Cart</button>
-            <button type="button" class="profile-wishlist-remove" onclick="wishlistRemove(${f.id}); renderProfileWishlist();">Remove</button>
+            <button type="button" class="profile-wishlist-add" onclick="addFavoriteToCart(${f.id})">${typeof mainText === 'function' ? mainText('product.card.add_to_cart', 'Add to Cart', 'Sepete Ekle') : 'Add to Cart'}</button>
+            <button type="button" class="profile-wishlist-remove" onclick="wishlistRemove(${f.id}); renderProfileWishlist();">${typeof mainText === 'function' ? mainText('wishlist.remove', 'Remove', 'Kaldır') : 'Remove'}</button>
           </div>
         </div>
       `;

@@ -32,7 +32,7 @@ function call_openai_chat(string $apiKey, string $userMessage, string $page, str
 function normalize_intent(string $intent): string
 {
     $intent = strtolower(trim($intent));
-    $allowed = ["returns", "payment", "shipping", "order_status", "cart_question", "product_search", "general"];
+    $allowed = ["returns", "payment", "shipping", "order_status", "cart_question", "product_search", "product_followup", "general"];
     return in_array($intent, $allowed, true) ? $intent : "general";
 }
 
@@ -103,6 +103,21 @@ function get_experiment_variants(): array
     ];
 }
 
+function get_reported_experiment_bucket(): string
+{
+    $mode = get_experiment_mode();
+    if ($mode === "ab") {
+        return get_experiment_bucket();
+    }
+    if ($mode === "ai") {
+        return "ai";
+    }
+    if ($mode === "rule") {
+        return "rule";
+    }
+    return "hybrid";
+}
+
 function is_ai_reply_grounded(string $reply, string $intent, array $products): bool
 {
     $replyLower = to_lower($reply);
@@ -114,6 +129,18 @@ function is_ai_reply_grounded(string $reply, string $intent, array $products): b
         }
         if (preg_match('/\b(in stock|out of stock|stokta|stok yok)\b/iu', $replyLower)) {
             return false;
+        }
+        if (preg_match('/\b(recommend|suggest|öner|göz at|great deal|ürün öner|şunlara göz at|here are some)\b/ui', $replyLower)) {
+            return false;
+        }
+        if (preg_match('/^\s*-\s.+\(\$\d+/m', $reply)) {
+            return false;
+        }
+        foreach ($products as $p) {
+            $name = to_lower((string) ($p['name'] ?? ''));
+            if ($name !== '' && mb_strlen($name) >= 6 && str_contains($replyLower, $name)) {
+                return false;
+            }
         }
     }
 

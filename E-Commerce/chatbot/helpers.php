@@ -5,6 +5,15 @@ function to_lower(string $text): string
     return function_exists("mb_strtolower") ? mb_strtolower($text, "UTF-8") : strtolower($text);
 }
 
+function pick_deterministic_reply(array $options, string $seed): string
+{
+    if ($options === []) {
+        return '';
+    }
+    $idx = abs((int) crc32($seed)) % count($options);
+    return $options[$idx];
+}
+
 function get_chat_user_name(): string
 {
     $raw = trim((string) ($_SESSION["user_name"] ?? ""));

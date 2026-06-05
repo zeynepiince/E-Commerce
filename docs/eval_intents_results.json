@@ -1,0 +1,150 @@
+{
+    "dataset": "\/Applications\/MAMP\/htdocs\/chatbotv2\/docs\/intent_test_set.json",
+    "evaluated_at": "2026-06-05T09:41:59+00:00",
+    "classifier": "detect_intent() rule-based",
+    "total_samples": 90,
+    "correct": 90,
+    "accuracy": 1,
+    "macro_f1": 1,
+    "per_class": {
+        "cart_question": {
+            "support": 12,
+            "tp": 12,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "general": {
+            "support": 14,
+            "tp": 14,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "order_status": {
+            "support": 12,
+            "tp": 12,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "payment": {
+            "support": 13,
+            "tp": 13,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "product_search": {
+            "support": 14,
+            "tp": 14,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "returns": {
+            "support": 12,
+            "tp": 12,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        },
+        "shipping": {
+            "support": 13,
+            "tp": 13,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+        }
+    },
+    "confusion_matrix": {
+        "cart_question": {
+            "cart_question": 12,
+            "general": 0,
+            "order_status": 0,
+            "payment": 0,
+            "product_search": 0,
+            "returns": 0,
+            "shipping": 0
+        },
+        "general": {
+            "cart_question": 0,
+            "general": 14,
+            "order_status": 0,
+            "payment": 0,
+            "product_search": 0,
+            "returns": 0,
+            "shipping": 0
+        },
+        "order_status": {
+            "cart_question": 0,
+            "general": 0,
+            "order_status": 12,
+            "payment": 0,
+            "product_search": 0,
+            "returns": 0,
+            "shipping": 0
+        },
+        "payment": {
+            "cart_question": 0,
+            "general": 0,
+            "order_status": 0,
+            "payment": 13,
+            "product_search": 0,
+            "returns": 0,
+            "shipping": 0
+        },
+        "product_search": {
+            "cart_question": 0,
+            "general": 0,
+            "order_status": 0,
+            "payment": 0,
+            "product_search": 14,
+            "returns": 0,
+            "shipping": 0
+        },
+        "returns": {
+            "cart_question": 0,
+            "general": 0,
+            "order_status": 0,
+            "payment": 0,
+            "product_search": 0,
+            "returns": 12,
+            "shipping": 0
+        },
+        "shipping": {
+            "cart_question": 0,
+            "general": 0,
+            "order_status": 0,
+            "payment": 0,
+            "product_search": 0,
+            "returns": 0,
+            "shipping": 13
+        }
+    },
+    "by_language": {
+        "en": {
+            "total": 53,
+            "correct": 53
+        },
+        "tr": {
+            "total": 37,
+            "correct": 37
+        }
+    },
+    "failures": []
+}

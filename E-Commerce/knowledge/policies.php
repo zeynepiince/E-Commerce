@@ -10,8 +10,8 @@ return [
         "en" => "You can start a return from the Orders page by selecting the relevant order. Most items can be returned within 30 days if unused and in original condition. After approval, refunds are processed based on the original payment method.",
     ],
     "payment" => [
-        "tr" => "Ödemeler güvenli altyapı üzerinden işlenir. Kredi kartı ve desteklenen diğer ödeme yöntemleri kullanılabilir. Siparişin durumu ödeme onayı sonrası güncellenir.",
-        "en" => "Payments are processed through a secure infrastructure. Credit cards and other supported methods can be used. Order status is updated after payment confirmation.",
+        "tr" => "Ödemeler iyzico güvenli ödeme altyapısı ile işlenir. Kredi/banka kartı ve taksit seçenekleri checkout sırasında iyzico ekranında sunulur. Siparişin durumu ödeme onayı sonrası güncellenir.",
+        "en" => "Payments are processed via the iyzico secure payment platform. Credit/debit cards and installment options are shown on the iyzico checkout screen. Order status updates after payment confirmation.",
     ],
 ];
 

@@ -1,13 +1,20 @@
 <?php
-session_start();
-require_once "db.php";
+require_once __DIR__ . '/functions.php';
 require_once __DIR__ . "/chatbot/helpers.php";
 require_once __DIR__ . "/chatbot/responses.php";
 require_once __DIR__ . "/chatbot/actions.php";
 require_once __DIR__ . "/chatbot/ai.php";
 require_once __DIR__ . "/chatbot/intent.php";
+require_once __DIR__ . "/chatbot/consistency.php";
 require_once __DIR__ . "/i18n.php";
 header("Content-Type: application/json; charset=UTF-8");
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(["reply" => "Method not allowed."]);
+    exit;
+}
+
+csrf_require(true);
 
 $data = json_decode(file_get_contents("php://input"), true);
 $rawMessage = trim((string) ($data["message"] ?? ""));
@@ -29,12 +36,6 @@ if ($lang !== "en" && $lang !== "tr") {
 }
 $policyKnowledge = load_policy_knowledge();
 $entities = extract_entities($rawMessage);
-$intent = ($intent === "general" && infer_product_search_intent($pdo, $rawMessage, $entities)) ? "product_search" : $intent;
-if ($policyLockedIntent !== null) {
-    $intent = $policyLockedIntent;
-}
-// Reference intent before AI resolver (used as proxy "true" label in confusion matrix)
-$referenceIntent = $intent;
 
 $memory = $_SESSION["chatbot_memory"] ?? [];
 if (!is_array($memory)) $memory = [];
@@ -48,76 +49,36 @@ if (!is_array($userProfile)) {
     $userProfile = ["prefers_budget" => false, "category_interest" => null];
 }
 
-if ($intent === "product_search" && !empty($memory["entities"]) && is_array($memory["entities"])) {
-    foreach (["max_price", "min_price", "category_like", "product_type", "color", "size", "brand", "sort_by"] as $k) {
-        if (empty($entities[$k]) && !empty($memory["entities"][$k])) $entities[$k] = $memory["entities"][$k];
-    }
-    if (empty($entities["features"]) && !empty($memory["entities"]["features"]) && is_array($memory["entities"]["features"])) {
-        $entities["features"] = $memory["entities"]["features"];
-    }
-    if ((empty($entities["budget"]["min"]) && !empty($entities["min_price"])) || (empty($entities["budget"]["max"]) && !empty($entities["max_price"]))) {
-        $entities["budget"]["min"] = $entities["min_price"] ?? null;
-        $entities["budget"]["max"] = $entities["max_price"] ?? null;
-    }
-}
+$lastSuggested = $memory["last_suggested_products"] ?? [];
+$hadProductContext = in_array(($memory["last_intent"] ?? ""), ["product_search", "product_followup"], true)
+    || (is_array($lastSuggested) && $lastSuggested !== []);
 
-// Light-weight session persona update (behavior learning)
-if (is_numeric($entities["max_price"] ?? null) || preg_match('/\b(under|below|budget|cheap|affordable|alt[ıi]|ucuz)\b/ui', $rawMessage)) {
-    $userProfile["prefers_budget"] = true;
-}
-if (!empty($entities["category_like"])) {
-    $userProfile["category_interest"] = (string) $entities["category_like"];
-} elseif (!empty($entities["product_type"])) {
-    $userProfile["category_interest"] = (string) $entities["product_type"];
-}
-
-// Apply persona to next recommendations when user is vague
-if (($intent === "product_search" || $intent === "general")) {
-    if (empty($entities["category_like"]) && !empty($userProfile["category_interest"])) {
-        $entities["category_like"] = (string) $userProfile["category_interest"];
-    }
-    if ($userProfile["prefers_budget"] === true && empty($entities["max_price"]) && is_numeric($memory["last_suggested_max_price"] ?? null)) {
-        $entities["max_price"] = round((float) $memory["last_suggested_max_price"] * 0.9, 2);
-        $entities["budget"]["max"] = $entities["max_price"];
-        if (empty($entities["sort_by"])) {
-            $entities["sort_by"] = "price_asc";
-        }
-    }
-}
-
-if ($intent === "general" && (($memory["last_intent"] ?? "") === "product_search")) {
-    $hasRefinementEntity = !empty($entities["max_price"]) || !empty($entities["min_price"]) || !empty($entities["category_like"]) || !empty($entities["color"]) || !empty($entities["size"]) || !empty($entities["brand"]);
+if ($intent === "general" && $hadProductContext) {
+    $isSizeFollowup = !empty($entities["size"])
+        || preg_match('/\b(sizes?|beden|numara)\b/ui', $rawMessage);
+    $isStockFollowup = preg_match('/\b(stock|stok|stokta|in\s*stock|out\s*of\s*stock)\b/ui', $rawMessage)
+        || (preg_match('/\b(available|availability)\b/ui', $rawMessage) && !preg_match('/\b(sizes?|beden)\b/ui', $rawMessage));
+    $hasRefinementEntity = !empty($entities["max_price"]) || !empty($entities["min_price"]) || !empty($entities["category_like"]) || !empty($entities["color"]) || !empty($entities["size"]) || !empty($entities["brand"]) || !empty($entities["audience"]);
     $hasRefinementWords = preg_match('/\b(those|these|only|sadece|olan|olanları|onlari|onları|goster|göster|daha ucuz|cheaper|black|white|siyah|beyaz|kablosuz|bluetooth|wireless|ucuz)\b/ui', $rawMessage);
-    if ($hasRefinementEntity || $hasRefinementWords) $intent = "product_search";
+    $isAudienceCorrection = is_audience_correction_message($rawMessage);
+
+    if ($isSizeFollowup || $isStockFollowup) {
+        $intent = "product_followup";
+    } elseif ($hasRefinementEntity || $hasRefinementWords || $isAudienceCorrection) {
+        $intent = "product_search";
+    }
 }
 
-// Merge memory context for follow-up product refinements
-if ($intent === "product_search" && !empty($memory["entities"]) && is_array($memory["entities"])) {
-    foreach (["category_like", "color", "size", "brand"] as $k) {
-        if (empty($entities[$k]) && !empty($memory["entities"][$k])) $entities[$k] = $memory["entities"][$k];
-    }
-    if (empty($entities["keywords"]) && !empty($memory["entities"]["keywords"]) && is_array($memory["entities"]["keywords"])) {
-        $entities["keywords"] = $memory["entities"]["keywords"];
-    }
-
-    // "biraz daha ucuz" / "cheaper" => tighten max_price based on previous context
-    $asksCheaper = preg_match('/\b(cheaper|more affordable|daha ucuz|biraz daha ucuz|ucuz)\b/ui', $rawMessage);
-    if ($asksCheaper) {
-        $prevMax = null;
-        if (is_numeric($entities["max_price"] ?? null)) {
-            $prevMax = (float) $entities["max_price"];
-        } elseif (is_numeric($memory["last_suggested_max_price"] ?? null)) {
-            $prevMax = (float) $memory["last_suggested_max_price"];
-        } elseif (is_numeric($memory["entities"]["max_price"] ?? null)) {
-            $prevMax = (float) $memory["entities"]["max_price"];
-        }
-        if (is_numeric($prevMax) && $prevMax > 0) {
-            $entities["max_price"] = round($prevMax * 0.85, 2);
-            $entities["budget"]["max"] = $entities["max_price"];
-            $entities["sort_by"] = "price_asc";
-        }
-    }
+$intent = ($intent === "general" && infer_product_search_intent($pdo, $rawMessage, $entities)) ? "product_search" : $intent;
+if ($policyLockedIntent !== null) {
+    $intent = $policyLockedIntent;
 }
+// Reference intent before AI resolver (used as proxy "true" label in confusion matrix)
+$referenceIntent = $intent;
+
+$sessionCtx = apply_product_search_session_context($entities, $rawMessage, $intent, $memory, $userProfile);
+$entities = $sessionCtx['entities'];
+$userProfile = $sessionCtx['userProfile'];
 
 $rate = $_SESSION["chatbot_rate"] ?? ["window_start" => time(), "count" => 0];
 if (!is_array($rate) || !isset($rate["window_start"], $rate["count"])) $rate = ["window_start" => time(), "count" => 0];
@@ -144,7 +105,9 @@ if ($policyLockedIntent !== null) {
 }
 $intentConfidence = ($policyLockedIntent !== null)
     ? 0.96
-    : ((preg_match('/(\?|\b(how|what|where|when|why|nasıl|nasil|ne|nerede|ne zaman|neden)\b)/ui', $rawMessage) && $intent === "general") ? 0.45 : 0.72);
+    : ($intent === "product_followup"
+        ? 0.92
+        : ((preg_match('/(\?|\b(how|what|where|when|why|nasıl|nasil|ne|nerede|ne zaman|neden)\b)/ui', $rawMessage) && $intent === "general") ? 0.45 : 0.72));
 $memory["last_intent"] = $intent;
 $memory["entities"] = $entities;
 $memory["last_message"] = $rawMessage;
@@ -152,32 +115,42 @@ $memory["last_cart"] = array_slice($cart, 0, 20);
 $_SESSION["chatbot_memory"] = $memory;
 $_SESSION["user_profile"] = $userProfile;
 
-$experimentMode = "default";
-$experimentBucket = "default";
-$experimentVariants = [
-    "exp1_guardrail" => "A",
-    "exp2_fallback" => "A"
-];
+$experimentMode = get_experiment_mode();
+$experimentBucket = get_reported_experiment_bucket();
+$experimentVariants = get_experiment_variants();
 
 $usedAi = false;
 $guardrailRejected = false;
-[$reply, $suggestedProducts, $redirectUrl, $responseSource] = handle_intent_action($pdo, $intent, $rawMessage, $lang, $policyKnowledge, $entities);
-
-if (
-    in_array($intent, ["shipping", "returns", "payment", "order_status"], true)
-    && (
-        $responseSource === "product_search"
-        || !empty($suggestedProducts)
-        || preg_match('/^\s*-\s.+\(\$\d+/m', $reply)
-        || str_contains(to_lower($reply), "here are some good options")
-    )
-) {
-    $intent = $policyLockedIntent ?: $intent;
-    [$reply, $suggestedProducts, $redirectUrl, $responseSource] = handle_intent_action($pdo, $intent, $rawMessage, $lang, $policyKnowledge, $entities);
+$chatUserId = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+$entities['_raw_message'] = $rawMessage;
+[$reply, $suggestedProducts, $redirectUrl, $responseSource, $actionEntities] = handle_intent_action($pdo, $intent, $rawMessage, $lang, $policyKnowledge, $entities, $chatUserId, $memory);
+if (is_array($actionEntities ?? null) && $actionEntities !== []) {
+    $entities = $actionEntities;
 }
 
-if (should_use_ai($apiKey) && $intent !== "product_search") {
-    $contextProducts = !empty($suggestedProducts) ? $suggestedProducts : fetch_top_products($pdo, 6);
+if (policy_intent_has_product_leak($intent, $reply, $suggestedProducts, $responseSource)) {
+    $intent = $policyLockedIntent ?: $intent;
+    $chatUserId = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+    [$reply, $suggestedProducts, $redirectUrl, $responseSource, $actionEntities] = handle_intent_action($pdo, $intent, $rawMessage, $lang, $policyKnowledge, $entities, $chatUserId, $memory);
+    if (is_array($actionEntities ?? null) && $actionEntities !== []) {
+        $entities = $actionEntities;
+    }
+}
+
+[$reply, $suggestedProducts, $responseSource] = enforce_response_consistency(
+    $pdo,
+    $intent,
+    $reply,
+    $suggestedProducts,
+    $entities,
+    $lang,
+    $responseSource
+);
+
+if (should_use_ai($apiKey) && !in_array($intent, ["product_search", "product_followup"], true)) {
+    $contextProducts = in_array($intent, ["shipping", "returns", "payment", "order_status"], true)
+        ? []
+        : (!empty($suggestedProducts) ? $suggestedProducts : fetch_top_products($pdo, 6));
     $aiReply = call_openai_chat($apiKey, $rawMessage, $page, build_cart_context($cart), $contextProducts, $history, build_policy_context($policyKnowledge, $lang), $lang, $chatUserName);
     $isStrictGuardrail = (($experimentVariants["exp1_guardrail"] ?? "A") === "B");
     $passesGuardrail = false;
@@ -196,6 +169,7 @@ if (should_use_ai($apiKey) && $intent !== "product_search") {
 }
 
 if (!empty($suggestedProducts)) {
+    $memory["last_suggested_products"] = array_slice($suggestedProducts, 0, 6);
     $prices = array_map(static fn($p) => (float) ($p["price"] ?? 0), $suggestedProducts);
     $prices = array_filter($prices, static fn($v) => $v > 0);
     if (!empty($prices)) {
@@ -225,7 +199,10 @@ $askedClarification = false;
 $escalatedToHuman = false;
 $didYouMean = [];
 
-if ($confidence < 0.55) {
+$lowConfidenceThreshold = confidence_low_threshold();
+$didYouMeanThreshold = confidence_did_you_mean_threshold();
+
+if ($confidence < $lowConfidenceThreshold && !should_skip_clarification($intent, $entities, $reply)) {
     $fallbackVariant = (string) ($experimentVariants["exp2_fallback"] ?? "A");
     if ($fallbackVariant === "B") {
         [$reply, $escalatedToHuman] = maybe_add_escalation($reply, 0.01, $lang);
@@ -246,53 +223,37 @@ if ($confidence < 0.55) {
     $memory["low_confidence_count"] = 0;
 }
 
-if ($confidence < 0.65) {
-    if ($intent === "product_search") {
-        $didYouMean = [
-            $lang === "tr" ? "3000 TL altı öner" : "Suggest items under $100",
-            $lang === "tr" ? "Kablosuz modelleri göster" : "Show wireless options",
-            $lang === "tr" ? "En popüler ürünler" : "Show most popular products",
-        ];
-    } elseif ($intent === "shipping" || $intent === "order_status") {
-        $didYouMean = [
-            $lang === "tr" ? "Siparişim nerede?" : "Where is my order?",
-            $lang === "tr" ? "Tahmini teslim tarihi" : "Estimated delivery date",
-            $lang === "tr" ? "Kargo ücreti ne kadar?" : "How much is shipping?",
-        ];
-    } else {
-        $didYouMean = [
-            $lang === "tr" ? "Ürün öner" : "Suggest products",
-            $lang === "tr" ? "İade koşulları neler?" : "What is your return policy?",
-            $lang === "tr" ? "Ödeme yöntemleri neler?" : "What payment methods do you support?",
-        ];
-    }
+if ($confidence < $didYouMeanThreshold) {
+    $didYouMean = build_did_you_mean_suggestions($intent, $lang);
 }
 $history[] = ["role" => "user", "content" => $rawMessage];
 $history[] = ["role" => "assistant", "content" => $reply];
 $memory["history"] = array_slice($history, -10);
 $_SESSION["chatbot_memory"] = $memory;
 
-$user_id = !empty($_SESSION["user_id"]) ? (int) $_SESSION["user_id"] : null;
-if (!$user_id) {
-    try {
-        $uStmt = $pdo->query("SELECT user_id FROM users ORDER BY user_id ASC LIMIT 1");
-        $firstUserId = $uStmt ? $uStmt->fetchColumn() : false;
-        $user_id = $firstUserId ? (int) $firstUserId : null;
-    } catch (Throwable $e) {
-        $user_id = null;
-    }
+$recommendedProductId = null;
+if (!empty($suggestedProducts[0]["product_id"])) {
+    $recommendedProductId = (int) $suggestedProducts[0]["product_id"];
 }
 
-if ($user_id) {
+if ($chatUserId) {
     try {
         $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender, intent) VALUES (?, ?, 'user', ?) ");
-        $stmt->execute([ $user_id, $rawMessage, $intent ]);
-        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender, intent) VALUES (?, ?, 'bot', ?)");
-        $stmt->execute([ $user_id, $reply, $intent ]);
+        $stmt->execute([$chatUserId, $rawMessage, $intent]);
+        $stmt = $pdo->prepare("INSERT INTO support_interactions (user_id, message, sender, intent, recommended_product_id) VALUES (?, ?, 'bot', ?, ?)");
+        $stmt->execute([$chatUserId, $reply, $intent, $recommendedProductId > 0 ? $recommendedProductId : null]);
     } catch (Throwable $e) {
         // Support interaction logging should never block metric logging.
     }
 }
+
+$memory["last_confidence"] = round($confidence, 2);
+$memory["last_experiment"] = [
+    "mode" => $experimentMode,
+    "bucket" => $experimentBucket,
+    "variants" => $experimentVariants,
+];
+$_SESSION["chatbot_memory"] = $memory;
 
 echo json_encode([
     "reply" => $reply,
@@ -303,9 +264,14 @@ echo json_encode([
     "source" => $responseSource,
     "used_ai" => $usedAi,
     "confidence" => round($confidence, 2),
+    "confidence_thresholds" => [
+        "low" => $lowConfidenceThreshold,
+        "did_you_mean" => $didYouMeanThreshold,
+    ],
     "experiment_mode" => $experimentMode,
     "experiment_bucket" => $experimentBucket,
     "experiment_variants" => $experimentVariants,
+    "latency_ms" => (int) round((microtime(true) - $requestStart) * 1000),
     "asked_clarification" => $askedClarification,
     "escalated_to_human" => $escalatedToHuman,
     "did_you_mean" => $didYouMean,

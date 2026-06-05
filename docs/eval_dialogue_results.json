@@ -1,0 +1,317 @@
+{
+    "dataset": "\/Applications\/MAMP\/htdocs\/chatbotv2\/docs\/dialogue_test_set.json",
+    "evaluated_at": "2026-06-05T10:09:03+00:00",
+    "pipeline": "rule-based multi-turn simulate_chatbot_turn() — no OpenAI",
+    "scenario_count": 12,
+    "turn_count": 19,
+    "scenario_success_rate": 1,
+    "scenarios_passed": 12,
+    "scenarios_failed": 0,
+    "turn_intent_accuracy": 1,
+    "turn_reply_accuracy": 1,
+    "intent_correct": 19,
+    "intent_total": 19,
+    "reply_correct": 19,
+    "reply_total": 19,
+    "scenarios": [
+        {
+            "id": "dlg_01",
+            "name": "EN tshirt → size S → stock",
+            "lang": "en",
+            "turn_count": 3,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "I want to buy tshirt",
+                    "intent": "product_search",
+                    "source": "product_search",
+                    "confidence": 0.72,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Here are some good options for you:\n- Gigabyte Aorus Men Tshirt ($24.99)"
+                },
+                {
+                    "turn": 2,
+                    "user": "does it have Size S",
+                    "intent": "product_followup",
+                    "source": "product_followup",
+                    "confidence": 0.92,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Yes, size S is available for Gigabyte Aorus Men Tshirt. Sizes: S, M, L, XL, XXL."
+                },
+                {
+                    "turn": 3,
+                    "user": "stock?",
+                    "intent": "product_followup",
+                    "source": "product_followup",
+                    "confidence": 0.92,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Gigabyte Aorus Men Tshirt is in stock (100 units available)."
+                }
+            ]
+        },
+        {
+            "id": "dlg_02",
+            "name": "TR tişört → S beden → stok",
+            "lang": "tr",
+            "turn_count": 3,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "tshirt almak istiyorum",
+                    "intent": "product_search",
+                    "source": "product_search",
+                    "confidence": 0.72,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Sana uygun olabilecek seçenekler:\n- Gigabyte Aorus Men Tshirt ($24.99)"
+                },
+                {
+                    "turn": 2,
+                    "user": "S beden var mı",
+                    "intent": "product_followup",
+                    "source": "product_followup",
+                    "confidence": 0.9,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Gigabyte Aorus Men Tshirt bedenleri: S, M, L, XL, XXL."
+                },
+                {
+                    "turn": 3,
+                    "user": "stokta mı",
+                    "intent": "product_followup",
+                    "source": "product_followup",
+                    "confidence": 0.92,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Gigabyte Aorus Men Tshirt şu anda stokta (100 adet)."
+                }
+            ]
+        },
+        {
+            "id": "dlg_03",
+            "name": "EN product search then cheaper refinement",
+            "lang": "en",
+            "turn_count": 2,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "show me wireless headphones",
+                    "intent": "product_search",
+                    "source": "product_search",
+                    "confidence": 0.72,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Here are some good options for you:\n- Wireless Headphones ($229.00)\n- Apple Airpods ($129.99)"
+                },
+                {
+                    "turn": 2,
+                    "user": "show cheaper ones",
+                    "intent": "product_search",
+                    "source": "product_search",
+                    "confidence": 0.72,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Here are some good options for you:\n- Apple Airpods ($129.99)"
+                }
+            ]
+        },
+        {
+            "id": "dlg_04",
+            "name": "EN shipping policy",
+            "lang": "en",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "how long does shipping take",
+                    "intent": "shipping",
+                    "source": "rule_based",
+                    "confidence": 0.7,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Shipping usually takes 2-4 business days. During busy periods, delivery may take longer. Orders above certain thresholds"
+                }
+            ]
+        },
+        {
+            "id": "dlg_05",
+            "name": "TR return policy",
+            "lang": "tr",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "iade koşulları neler",
+                    "intent": "returns",
+                    "source": "rule_based",
+                    "confidence": 0.7,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "İade işlemini Orders sayfasından ilgili siparişi seçerek başlatabilirsin. Çoğu ürün, kullanılmamış ve orijinal ambalajı "
+                }
+            ]
+        },
+        {
+            "id": "dlg_06",
+            "name": "EN order status guest",
+            "lang": "en",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "where is my order",
+                    "intent": "order_status",
+                    "source": "order_lookup",
+                    "confidence": 0.88,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Please sign in to view your order status. After logging in, send your order number (e.g. order #12) or open the Orders p"
+                }
+            ]
+        },
+        {
+            "id": "dlg_07",
+            "name": "EN order status logged-in user",
+            "lang": "en",
+            "turn_count": 2,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "track my orders",
+                    "intent": "order_status",
+                    "source": "order_lookup",
+                    "confidence": 0.88,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Your recent orders:\n#22 — Pending — $518.00 — 05.06.2026 12:39\n  • Espresso Machine, Wireless Headphones\n#20 — Pending —"
+                },
+                {
+                    "turn": 2,
+                    "user": "order #20",
+                    "intent": "order_status",
+                    "source": "order_lookup",
+                    "confidence": 0.88,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Order #20:\n#20 — Pending — $440.96 — 06.05.2026 17:32\n  • Annibale Colombo Bed, Running Sneakers, Dior J'adore, Beef Ste"
+                }
+            ]
+        },
+        {
+            "id": "dlg_08",
+            "name": "EN stock question without product context",
+            "lang": "en",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "stock?",
+                    "intent": "general",
+                    "source": "rule_based",
+                    "confidence": 0.45,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Happy to help. You can ask about product recommendations, shipping, returns, or order tracking."
+                }
+            ]
+        },
+        {
+            "id": "dlg_09",
+            "name": "EN greeting",
+            "lang": "en",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "hello",
+                    "intent": "general",
+                    "source": "rule_based",
+                    "confidence": 0.62,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Happy to help. You can ask about product recommendations, shipping, returns, or order tracking."
+                }
+            ]
+        },
+        {
+            "id": "dlg_10",
+            "name": "EN payment methods",
+            "lang": "en",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "what payment methods do you accept",
+                    "intent": "payment",
+                    "source": "rule_based",
+                    "confidence": 0.7,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Payments are processed through a secure infrastructure. Credit cards and other supported methods can be used. Order stat"
+                }
+            ]
+        },
+        {
+            "id": "dlg_11",
+            "name": "EN size follow-up preserves product memory",
+            "lang": "en",
+            "turn_count": 2,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "I want to buy tshirt",
+                    "intent": "product_search",
+                    "source": "product_search",
+                    "confidence": 0.72,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Here are some good options for you:\n- Gigabyte Aorus Men Tshirt ($24.99)"
+                },
+                {
+                    "turn": 2,
+                    "user": "what sizes are available",
+                    "intent": "product_followup",
+                    "source": "product_followup",
+                    "confidence": 0.92,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Yes, size S is available for Gigabyte Aorus Men Tshirt. Sizes: S, M, L, XL, XXL."
+                }
+            ]
+        },
+        {
+            "id": "dlg_12",
+            "name": "TR order status guest",
+            "lang": "tr",
+            "turn_count": 1,
+            "passed": true,
+            "turns": [
+                {
+                    "turn": 1,
+                    "user": "siparişim nerede",
+                    "intent": "order_status",
+                    "source": "order_lookup",
+                    "confidence": 0.88,
+                    "passed": true,
+                    "errors": [],
+                    "reply_excerpt": "Sipariş durumunu görmek için önce giriş yapmalısın. Girişten sonra sipariş numaranı yazabilirsin (örn. sipariş #12) veya"
+                }
+            ]
+        }
+    ],
+    "failures": []
+}

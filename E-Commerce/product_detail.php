@@ -14,6 +14,7 @@ if ($productName) {
       p.image_url,
       p.description,
       p.stock_quantity,
+      p.sizes,
       p.sub_category,
       COALESCE(c.category_name, '') AS category
       FROM products p
@@ -31,6 +32,7 @@ if ($productName) {
             'image_url' => $dbProduct['image_url'],
             'description' => $dbProduct['description'],
             'stock_quantity' => $dbProduct['stock_quantity'],
+            'sizes' => $dbProduct['sizes'] ?? null,
             'category' => $dbProduct['category'],
             'sub_category' => $dbProduct['sub_category'],
             'likes' => rand(10, 100)

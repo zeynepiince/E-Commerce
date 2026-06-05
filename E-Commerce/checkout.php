@@ -4,124 +4,103 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'functions.php';
+require_once __DIR__ . '/payments/IyzicoService.php';
 
-function resolve_product_id_for_order_item(PDO $pdo, array $item): ?int
-{
-    $rawId = $item["id"] ?? null;
-    if (is_numeric($rawId)) {
-        $candidate = (int) $rawId;
-        if ($candidate > 0) {
-            $stmt = $pdo->prepare("SELECT product_id FROM products WHERE product_id = ? LIMIT 1");
-            $stmt->execute([$candidate]);
-            $found = $stmt->fetchColumn();
-            if ($found !== false) return (int) $found;
-        }
-    }
-
-    $name = trim((string) ($item["name"] ?? ""));
-    if ($name !== "") {
-        $stmt = $pdo->prepare("SELECT product_id FROM products WHERE name = ? LIMIT 1");
-        $stmt->execute([$name]);
-        $found = $stmt->fetchColumn();
-        if ($found !== false) return (int) $found;
-    }
-
-    return null;
-}
-
-// JSON API for checkout (called from JS)
+// JSON API — iyzico ödeme başlatma
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST'
     && isset($_SERVER['CONTENT_TYPE'])
     && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false
 ) {
-    $data = json_decode(file_get_contents("php://input"), true);
+    header('Content-Type: application/json; charset=utf-8');
+    csrf_require(true);
 
-    if (!isset($data['cart']) || empty($data['cart'])) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($data) || empty($data['cart']) || !is_array($data['cart'])) {
+        echo json_encode(['success' => false, 'error' => 'Empty cart']);
+        exit;
+    }
+
+    $shipping = is_array($data['shipping'] ?? null) ? $data['shipping'] : [];
+    $requiredShipping = ['full_name', 'email', 'address', 'city', 'zip'];
+    foreach ($requiredShipping as $field) {
+        if (trim((string) ($shipping[$field] ?? '')) === '') {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Missing shipping field: ' . $field,
+            ]);
+            exit;
+        }
+    }
+
+    $phoneCountry = trim((string) ($shipping['phone_country'] ?? 'TR'));
+    $phoneNumber = preg_replace('/\D+/', '', (string) ($shipping['phone_number'] ?? ''));
+    $dial = '+90';
+    if ($phoneCountry === 'US') {
+        $dial = '+1';
+    } elseif ($phoneCountry === 'GB') {
+        $dial = '+44';
+    }
+    $shipping['phone'] = $phoneNumber !== '' ? $dial . $phoneNumber : '';
+    unset($shipping['phone_number']);
+
+    $user_id = require_login();
+
+    if (!iyzico_is_configured()) {
         echo json_encode([
-            "success" => false,
-            "error" => "Empty cart"
+            'success' => false,
+            'error' => 'iyzico is not configured. Set IYZICO_API_KEY and IYZICO_SECRET_KEY in .env',
+            'code' => 'iyzico_not_configured',
         ]);
         exit;
     }
 
-    $cart    = $data['cart'];
-    $user_id = require_login();
-
     try {
-        $pdo->beginTransaction();
+        $userStmt = $pdo->prepare('SELECT user_id, full_name, email FROM users WHERE user_id = ? LIMIT 1');
+        $userStmt->execute([$user_id]);
+        $userRow = $userStmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'user_id' => $user_id,
+            'full_name' => (string) ($shipping['full_name'] ?? 'Customer'),
+            'email' => (string) ($shipping['email'] ?? ''),
+        ];
 
-        $total = 0;
-        foreach ($cart as $item) {
-            $total += (float) ($item["price"] ?? 0) * (int) ($item["qty"] ?? 1);
-        }
+        $created = create_awaiting_payment_order($pdo, $user_id, $data['cart'], $shipping);
+        $lang = get_current_lang();
+        $callbackUrl = site_absolute_url('payment_callback.php', ['lang' => $lang]);
 
-        $stmt = $pdo->prepare(
-            "INSERT INTO orders (user_id, total_amount, status)
-             VALUES (?, ?, ?)"
-        );
-        $stmt->execute([$user_id, $total, "pending"]);
-
-        $order_id = $pdo->lastInsertId();
-
-        $stmtItem = $pdo->prepare(
-            "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-             VALUES (?, ?, ?, ?)"
-        );
-        $stockSelect = $pdo->prepare("SELECT name, stock_quantity FROM products WHERE product_id = ? FOR UPDATE");
-        $stockUpdate = $pdo->prepare(
-            "UPDATE products SET stock_quantity = stock_quantity - ?
-             WHERE product_id = ? AND stock_quantity >= ?"
+        $iyzico = iyzico_initialize_checkout(
+            $created['order_id'],
+            $created['conversation_id'],
+            (float) $created['total_usd'],
+            $created['lines'],
+            $shipping,
+            $userRow,
+            $callbackUrl,
+            $lang
         );
 
-        foreach ($cart as $item) {
-            $qty               = max(1, (int) ($item["qty"] ?? 1));
-            $resolvedProductId = resolve_product_id_for_order_item($pdo, is_array($item) ? $item : []);
-
-            if ($resolvedProductId !== null) {
-                $stockSelect->execute([$resolvedProductId]);
-                $row = $stockSelect->fetch(PDO::FETCH_ASSOC);
-                if ($row === false) {
-                    throw new RuntimeException("Product not found (id={$resolvedProductId})");
-                }
-                $available = (int) ($row['stock_quantity'] ?? 0);
-                if ($available < $qty) {
-                    throw new RuntimeException(
-                        "Insufficient stock for \"" . ($row['name'] ?? '#' . $resolvedProductId) .
-                        "\" (requested {$qty}, available {$available})"
-                    );
-                }
-
-                $stockUpdate->execute([$qty, $resolvedProductId, $qty]);
-                if ($stockUpdate->rowCount() === 0) {
-                    throw new RuntimeException(
-                        "Stock just changed for \"" . ($row['name'] ?? '#' . $resolvedProductId) .
-                        "\". Please refresh and try again."
-                    );
-                }
-            }
-
-            $stmtItem->execute([
-                $order_id,
-                $resolvedProductId,
-                $qty,
-                (float) ($item["price"] ?? 0)
-            ]);
-        }
-
-        $pdo->commit();
+        save_payment_record(
+            $pdo,
+            $created['order_id'],
+            $created['conversation_id'],
+            $iyzico['token'],
+            'pending',
+            (float) $iyzico['paid_price_try'],
+            $iyzico['raw'] ?? null
+        );
 
         echo json_encode([
-            "success"  => true,
-            "order_id" => $order_id
+            'success' => true,
+            'order_id' => $created['order_id'],
+            'payment_provider' => 'iyzico',
+            'payment_page_url' => $iyzico['payment_page_url'],
+            'token' => $iyzico['token'],
+            'amount_try' => $iyzico['paid_price_try'],
         ]);
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
         echo json_encode([
-            "success" => false,
-            "error"   => $e->getMessage()
+            'success' => false,
+            'error' => $e->getMessage(),
         ]);
     }
     exit;
@@ -129,8 +108,11 @@ if (
 
 require_login();
 
-$page_title = t("meta.checkout_title", "ZERA - Checkout");
+$page_title = t('meta.checkout_title', 'ZERA - Checkout');
 $is_checkout = true;
+$iyzico_ready = iyzico_is_configured();
+$checkout_user_name = $_SESSION['user_name'] ?? '';
+$checkout_user_email = $_SESSION['user_email'] ?? '';
 
 include 'includes/header.php';
 ?>
@@ -139,125 +121,89 @@ include 'includes/header.php';
 
 <main class="checkout-page">
   <div class="checkout-container">
-    <h1 class="checkout-title"><?= htmlspecialchars(t("checkout.title", "Checkout"), ENT_QUOTES, 'UTF-8') ?></h1>
-    <p class="checkout-subtitle"><?= htmlspecialchars(t("checkout.subtitle", "Review your order and complete your purchase securely."), ENT_QUOTES, 'UTF-8') ?></p>
+    <h1 class="checkout-title"><?= htmlspecialchars(t('checkout.title', 'Checkout'), ENT_QUOTES, 'UTF-8') ?></h1>
+    <p class="checkout-subtitle"><?= htmlspecialchars(t('checkout.subtitle', 'Review your order and complete your purchase securely.'), ENT_QUOTES, 'UTF-8') ?></p>
+
+    <?php if (!$iyzico_ready): ?>
+      <div class="checkout-alert checkout-alert--warn">
+        <?= htmlspecialchars(t('checkout.iyzico_not_configured', 'iyzico payment is not configured on this server. Add API keys to .env to enable checkout.'), ENT_QUOTES, 'UTF-8') ?>
+      </div>
+    <?php endif; ?>
 
     <div class="checkout-layout">
-      <!-- Left: Customer & Payment -->
       <div class="checkout-left">
         <form id="checkoutForm" class="checkout-form" onsubmit="event.preventDefault(); checkout();">
-          <!-- Customer & Shipping -->
           <section class="checkout-card checkout-section">
-            <h2 class="checkout-card-title"><?= htmlspecialchars(t("checkout.customer_shipping", "Customer & Shipping Information"), ENT_QUOTES, 'UTF-8') ?></h2>
+            <h2 class="checkout-card-title"><?= htmlspecialchars(t('checkout.customer_shipping', 'Customer & Shipping Information'), ENT_QUOTES, 'UTF-8') ?></h2>
             <div class="checkout-fields">
               <div class="checkout-field">
-                <label for="full_name"><?= htmlspecialchars(t("checkout.full_name", "Full Name"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="full_name" name="full_name" placeholder="<?= htmlspecialchars(t("checkout.full_name_placeholder", "John Doe"), ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="full_name"><?= htmlspecialchars(t('checkout.full_name', 'Full Name'), ENT_QUOTES, 'UTF-8') ?></label>
+                <input type="text" id="full_name" name="full_name" value="<?= htmlspecialchars((string) $checkout_user_name, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars(t('checkout.full_name_placeholder', 'John Doe'), ENT_QUOTES, 'UTF-8') ?>" required>
               </div>
               <div class="checkout-field">
-                <label for="email"><?= htmlspecialchars(t("checkout.email", "Email"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="email" id="email" name="email" placeholder="<?= htmlspecialchars(t("checkout.email_placeholder", "john@example.com"), ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="email"><?= htmlspecialchars(t('checkout.email', 'Email'), ENT_QUOTES, 'UTF-8') ?></label>
+                <input type="email" id="email" name="email" value="<?= htmlspecialchars((string) $checkout_user_email, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars(t('checkout.email_placeholder', 'john@example.com'), ENT_QUOTES, 'UTF-8') ?>" required>
               </div>
               <div class="checkout-field">
-                <label for="phone_number"><?= htmlspecialchars(t("checkout.phone", "Phone"), ENT_QUOTES, 'UTF-8') ?></label>
+                <label for="phone_number"><?= htmlspecialchars(t('checkout.phone', 'Phone'), ENT_QUOTES, 'UTF-8') ?></label>
                 <div class="checkout-phone-group">
-                  <select
-                    id="phone_country"
-                    name="phone_country"
-                    class="checkout-phone-country"
-                    aria-label="<?= htmlspecialchars(t("checkout.country", "Country"), ENT_QUOTES, 'UTF-8') ?>"
-                  >
-                    <option value="TR" data-dial="+90" data-len="10">🇹🇷 +90 Türkiye</option>
+                  <select id="phone_country" name="phone_country" class="checkout-phone-country" aria-label="<?= htmlspecialchars(t('checkout.country', 'Country'), ENT_QUOTES, 'UTF-8') ?>">
+                    <option value="TR" data-dial="+90" data-len="10" selected>🇹🇷 +90 Türkiye</option>
                     <option value="US" data-dial="+1" data-len="10">🇺🇸 +1 United States</option>
                     <option value="GB" data-dial="+44" data-len="10">🇬🇧 +44 United Kingdom</option>
                     <option value="DE" data-dial="+49" data-len="11">🇩🇪 +49 Germany</option>
                     <option value="FR" data-dial="+33" data-len="9">🇫🇷 +33 France</option>
-                    <option value="IT" data-dial="+39" data-len="10">🇮🇹 +39 Italy</option>
-                    <option value="ES" data-dial="+34" data-len="9">🇪🇸 +34 Spain</option>
-                    <option value="NL" data-dial="+31" data-len="9">🇳🇱 +31 Netherlands</option>
-                    <option value="AE" data-dial="+971" data-len="9">🇦🇪 +971 UAE</option>
-                    <option value="SA" data-dial="+966" data-len="9">🇸🇦 +966 Saudi Arabia</option>
                   </select>
-                  <input
-                    type="tel"
-                    id="phone_number"
-                    name="phone_number"
-                    class="checkout-phone-number"
-                    inputmode="numeric"
-                    autocomplete="tel-national"
-                    placeholder="<?= htmlspecialchars(t("checkout.phone_placeholder", "Phone number"), ENT_QUOTES, 'UTF-8') ?>"
-                    maxlength="10"
-                  >
+                  <input type="tel" id="phone_number" name="phone_number" class="checkout-phone-number" inputmode="numeric" autocomplete="tel-national" placeholder="<?= htmlspecialchars(t('checkout.phone_placeholder', 'Phone number'), ENT_QUOTES, 'UTF-8') ?>" maxlength="10">
                 </div>
               </div>
               <div class="checkout-field checkout-field--full">
-                <label for="address"><?= htmlspecialchars(t("checkout.address", "Address"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="address" name="address" placeholder="<?= htmlspecialchars(t("checkout.address_placeholder", "123 Main Street, Apt 4"), ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="address"><?= htmlspecialchars(t('checkout.address', 'Address'), ENT_QUOTES, 'UTF-8') ?></label>
+                <input type="text" id="address" name="address" placeholder="<?= htmlspecialchars(t('checkout.address_placeholder', '123 Main Street, Apt 4'), ENT_QUOTES, 'UTF-8') ?>" required>
               </div>
               <div class="checkout-field">
-                <label for="city"><?= htmlspecialchars(t("checkout.city", "City"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="city" name="city" placeholder="<?= htmlspecialchars(t("checkout.city_placeholder", "New York"), ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="city"><?= htmlspecialchars(t('checkout.city', 'City'), ENT_QUOTES, 'UTF-8') ?></label>
+                <input type="text" id="city" name="city" placeholder="<?= htmlspecialchars(t('checkout.city_placeholder', 'Istanbul'), ENT_QUOTES, 'UTF-8') ?>" required>
               </div>
               <div class="checkout-field">
-                <label for="zip"><?= htmlspecialchars(t("checkout.postal_code", "Postal Code"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="zip" name="zip" placeholder="<?= htmlspecialchars(t("checkout.postal_code_placeholder", "10001"), ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="zip"><?= htmlspecialchars(t('checkout.postal_code', 'Postal Code'), ENT_QUOTES, 'UTF-8') ?></label>
+                <input type="text" id="zip" name="zip" placeholder="<?= htmlspecialchars(t('checkout.postal_code_placeholder', '34000'), ENT_QUOTES, 'UTF-8') ?>" required>
               </div>
             </div>
           </section>
 
-          <!-- Payment -->
-          <section class="checkout-card checkout-section">
-            <h2 class="checkout-card-title"><?= htmlspecialchars(t("checkout.payment", "Payment"), ENT_QUOTES, 'UTF-8') ?></h2>
-            <div class="payment-methods">
-              <label class="payment-method payment-method--active">
-                <input type="radio" name="payment" value="card" checked>
-                <span class="payment-method-label"><?= htmlspecialchars(t("checkout.credit_card", "Credit Card"), ENT_QUOTES, 'UTF-8') ?></span>
-              </label>
-              <label class="payment-method">
-                <input type="radio" name="payment" value="paypal">
-                <span class="payment-method-label">PayPal</span>
-              </label>
-            </div>
-
-            <div class="payment-fields" id="paymentFields">
-              <div class="checkout-field checkout-field--full">
-                <label for="card_number"><?= htmlspecialchars(t("checkout.card_number", "Card Number"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="card_number" name="card_number" placeholder="<?= htmlspecialchars(t("checkout.card_number_placeholder", "•••• •••• •••• ••••"), ENT_QUOTES, 'UTF-8') ?>" maxlength="19" inputmode="numeric" autocomplete="cc-number" pattern="[0-9 ]*">
-              </div>
-              <div class="checkout-field-row">
-                <div class="checkout-field">
-                  <label for="expiry"><?= htmlspecialchars(t("checkout.expiry_date", "Expiry Date"), ENT_QUOTES, 'UTF-8') ?></label>
-                  <input type="text" id="expiry" name="expiry" placeholder="<?= htmlspecialchars(t("checkout.expiry_date_placeholder", "MM/YY"), ENT_QUOTES, 'UTF-8') ?>" maxlength="5">
-                </div>
-                <div class="checkout-field">
-                  <label for="cvv">CVV</label>
-                  <input type="text" id="cvv" name="cvv" placeholder="<?= htmlspecialchars(t("checkout.cvv_placeholder", "123"), ENT_QUOTES, 'UTF-8') ?>" maxlength="4" inputmode="numeric" autocomplete="cc-csc" pattern="[0-9]*">
-                </div>
-              </div>
-              <div class="checkout-field checkout-field--full">
-                <label for="card_holder"><?= htmlspecialchars(t("checkout.card_holder", "Card Holder Name"), ENT_QUOTES, 'UTF-8') ?></label>
-                <input type="text" id="card_holder" name="card_holder" placeholder="<?= htmlspecialchars(t("checkout.card_holder_placeholder", "John Doe"), ENT_QUOTES, 'UTF-8') ?>">
-              </div>
+          <section class="checkout-card checkout-section checkout-iyzico-card">
+            <h2 class="checkout-card-title"><?= htmlspecialchars(t('checkout.payment', 'Payment'), ENT_QUOTES, 'UTF-8') ?></h2>
+            <div class="iyzico-payment-box">
+              <div class="iyzico-payment-logo">iyzico</div>
+              <p class="iyzico-payment-text">
+                <?= htmlspecialchars(t('checkout.iyzico_description', 'You will complete your card payment securely on the iyzico payment page. Card details are not stored on our servers.'), ENT_QUOTES, 'UTF-8') ?>
+              </p>
+              <ul class="iyzico-payment-features">
+                <li><?= htmlspecialchars(t('checkout.iyzico_feature_installment', 'Installment options'), ENT_QUOTES, 'UTF-8') ?></li>
+                <li><?= htmlspecialchars(t('checkout.iyzico_feature_3ds', '3D Secure support'), ENT_QUOTES, 'UTF-8') ?></li>
+                <li><?= htmlspecialchars(t('checkout.iyzico_feature_secure', 'PCI-DSS compliant infrastructure'), ENT_QUOTES, 'UTF-8') ?></li>
+              </ul>
             </div>
           </section>
 
-          <button type="submit" class="checkout-submit" id="checkoutSubmit">
-            <?= htmlspecialchars(t("checkout.complete_purchase", "Complete Purchase"), ENT_QUOTES, 'UTF-8') ?>
+          <button type="submit" class="checkout-submit checkout-submit--iyzico" id="checkoutSubmit" <?= $iyzico_ready ? '' : 'disabled' ?>>
+            <?= htmlspecialchars(t('checkout.pay_with_iyzico', 'Pay with iyzico'), ENT_QUOTES, 'UTF-8') ?>
           </button>
 
           <div class="checkout-trust">
-            <span class="trust-item">🔒 <?= htmlspecialchars(t("checkout.trust.secure", "Secure Payment"), ENT_QUOTES, 'UTF-8') ?></span>
-            <span class="trust-item">🚚 <?= htmlspecialchars(t("checkout.trust.fast_shipping", "Fast Shipping"), ENT_QUOTES, 'UTF-8') ?></span>
-            <span class="trust-item">↩️ <?= htmlspecialchars(t("checkout.trust.easy_returns", "Easy Returns"), ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="trust-item">🔒 <?= htmlspecialchars(t('checkout.trust.secure', 'Secure Payment'), ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="trust-item">🚚 <?= htmlspecialchars(t('checkout.trust.fast_shipping', 'Fast Shipping'), ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="trust-item">↩️ <?= htmlspecialchars(t('checkout.trust.easy_returns', 'Easy Returns'), ENT_QUOTES, 'UTF-8') ?></span>
           </div>
         </form>
       </div>
 
-      <!-- Right: Order Summary (sticky) -->
       <aside class="checkout-right">
         <div class="checkout-summary-card" id="checkoutSummaryCard">
-          <h2 class="checkout-summary-title"><?= htmlspecialchars(t("checkout.order_summary", "Order Summary"), ENT_QUOTES, 'UTF-8') ?></h2>
+          <h2 class="checkout-summary-title"><?= htmlspecialchars(t('checkout.order_summary', 'Order Summary'), ENT_QUOTES, 'UTF-8') ?></h2>
           <div id="checkoutCartSummary" class="checkout-summary-content"></div>
+          <p class="checkout-summary-note"><?= htmlspecialchars(t('checkout.charged_in_try', 'Payment is processed in TRY via iyzico.'), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
       </aside>
     </div>

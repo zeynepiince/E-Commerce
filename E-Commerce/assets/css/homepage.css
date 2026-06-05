@@ -794,6 +794,20 @@
   transition: all 0.25s ease;
 }
 
+.newsletter-message {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.newsletter-message--success {
+  color: #047857;
+}
+
+.newsletter-message--error {
+  color: #b91c1c;
+}
+
 .newsletter-form button:hover {
   background: #e65c00;
   transform: translateY(-2px);

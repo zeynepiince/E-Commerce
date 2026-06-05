@@ -481,6 +481,84 @@
   }
 }
 
+.checkout-alert {
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.checkout-alert--warn {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+}
+
+.checkout-alert--info {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1e3a8a;
+}
+
+.checkout-alert--info p {
+  margin: 0.35rem 0 0;
+}
+
+.checkout-sandbox-card {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.checkout-iyzico-card .iyzico-payment-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.iyzico-payment-logo {
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1d4ed8;
+  margin-bottom: 10px;
+}
+
+.iyzico-payment-text {
+  margin: 0 0 12px;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.iyzico-payment-features {
+  margin: 0;
+  padding-left: 18px;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.iyzico-payment-features li {
+  margin-bottom: 4px;
+}
+
+.checkout-submit--iyzico {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+}
+
+.checkout-submit--iyzico:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+}
+
+.checkout-summary-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
 @media (max-width: 600px) {
   .checkout-page {
     padding: 20px 16px 40px;

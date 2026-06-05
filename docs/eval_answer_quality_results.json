@@ -1,0 +1,253 @@
+{
+    "dataset_dialogue": "\/Applications\/MAMP\/htdocs\/chatbotv2\/docs\/dialogue_test_set.json",
+    "dataset_quality": "\/Applications\/MAMP\/htdocs\/chatbotv2\/docs\/answer_quality_test_set.json",
+    "evaluated_at": "2026-06-05T10:09:24+00:00",
+    "pipeline": "rule-based replies + synthetic guardrail probes",
+    "task_success_rate": 1,
+    "answer_accuracy": 1,
+    "total_checks": 25,
+    "total_passed": 25,
+    "dialogue_grounding_checks": 11,
+    "dialogue_grounding_passed": 11,
+    "dialogue_grounding_rate": 1,
+    "by_category": {
+        "stock_grounding": {
+            "total": 2,
+            "passed": 2,
+            "rate": 1
+        },
+        "size_grounding": {
+            "total": 3,
+            "passed": 3,
+            "rate": 1
+        },
+        "policy_grounding": {
+            "total": 9,
+            "passed": 9,
+            "rate": 1
+        },
+        "price_grounding": {
+            "total": 3,
+            "passed": 3,
+            "rate": 1
+        },
+        "guardrail_normal": {
+            "total": 6,
+            "passed": 6,
+            "rate": 1,
+            "rejection_rate": 0.6667,
+            "trap_rejection_rate": 1
+        },
+        "guardrail_strict": {
+            "total": 2,
+            "passed": 2,
+            "rate": 1,
+            "rejection_rate": 0.5,
+            "trap_rejection_rate": 1
+        }
+    },
+    "dialogue_grounding": [
+        {
+            "scenario": "dlg_01",
+            "turn": 1,
+            "user": "I want to buy tshirt",
+            "passed": true,
+            "checks": {
+                "prices_match_products": true
+            }
+        },
+        {
+            "scenario": "dlg_01",
+            "turn": 2,
+            "user": "does it have Size S",
+            "passed": true,
+            "checks": {
+                "sizes_match_product": true
+            }
+        },
+        {
+            "scenario": "dlg_01",
+            "turn": 3,
+            "user": "stock?",
+            "passed": true,
+            "checks": {
+                "stock_matches_db": true
+            }
+        },
+        {
+            "scenario": "dlg_02",
+            "turn": 1,
+            "user": "tshirt almak istiyorum",
+            "passed": true,
+            "checks": {
+                "prices_match_products": true
+            }
+        },
+        {
+            "scenario": "dlg_02",
+            "turn": 2,
+            "user": "S beden var mı",
+            "passed": true,
+            "checks": {
+                "sizes_match_product": true
+            }
+        },
+        {
+            "scenario": "dlg_02",
+            "turn": 3,
+            "user": "stokta mı",
+            "passed": true,
+            "checks": {
+                "stock_matches_db": true
+            }
+        },
+        {
+            "scenario": "dlg_03",
+            "turn": 1,
+            "user": "show me wireless headphones",
+            "passed": true,
+            "checks": {
+                "prices_match_products": true
+            }
+        },
+        {
+            "scenario": "dlg_04",
+            "turn": 1,
+            "user": "how long does shipping take",
+            "passed": true,
+            "checks": {
+                "policy_grounded": true
+            }
+        },
+        {
+            "scenario": "dlg_05",
+            "turn": 1,
+            "user": "iade koşulları neler",
+            "passed": true,
+            "checks": {
+                "policy_grounded": true
+            }
+        },
+        {
+            "scenario": "dlg_10",
+            "turn": 1,
+            "user": "what payment methods do you accept",
+            "passed": true,
+            "checks": {
+                "policy_grounded": true
+            }
+        },
+        {
+            "scenario": "dlg_11",
+            "turn": 2,
+            "user": "what sizes are available",
+            "passed": true,
+            "checks": {
+                "sizes_match_product": true
+            }
+        }
+    ],
+    "policy_probes": [
+        {
+            "id": "pol_01",
+            "user": "what is your return policy",
+            "intent": "returns",
+            "passed": true,
+            "reply_excerpt": "You can start a return from the Orders page by selecting the relevant order. Most items can be retur"
+        },
+        {
+            "id": "pol_02",
+            "user": "iade koşulları neler",
+            "intent": "returns",
+            "passed": true,
+            "reply_excerpt": "İade işlemini Orders sayfasından ilgili siparişi seçerek başlatabilirsin. Çoğu ürün, kullanılmamış v"
+        },
+        {
+            "id": "pol_03",
+            "user": "how long does shipping take",
+            "intent": "shipping",
+            "passed": true,
+            "reply_excerpt": "Shipping usually takes 2-4 business days. During busy periods, delivery may take longer. Orders abov"
+        },
+        {
+            "id": "pol_04",
+            "user": "kargo ne kadar sürer",
+            "intent": "shipping",
+            "passed": true,
+            "reply_excerpt": "Kargo teslimat süresi genelde 2-4 iş günüdür. Yoğun dönemlerde bu süre uzayabilir. Belirli tutarın ü"
+        },
+        {
+            "id": "pol_05",
+            "user": "what payment methods do you accept",
+            "intent": "payment",
+            "passed": true,
+            "reply_excerpt": "Payments are processed through a secure infrastructure. Credit cards and other supported methods can"
+        },
+        {
+            "id": "pol_06",
+            "user": "ödeme yöntemleri neler",
+            "intent": "payment",
+            "passed": true,
+            "reply_excerpt": "Ödemeler güvenli altyapı üzerinden işlenir. Kredi kartı ve desteklenen diğer ödeme yöntemleri kullan"
+        }
+    ],
+    "guardrail_cases": [
+        {
+            "id": "gr_01",
+            "guardrail": "normal",
+            "expect_accepted": false,
+            "accepted": false,
+            "passed": true
+        },
+        {
+            "id": "gr_02",
+            "guardrail": "normal",
+            "expect_accepted": false,
+            "accepted": false,
+            "passed": true
+        },
+        {
+            "id": "gr_03",
+            "guardrail": "normal",
+            "expect_accepted": false,
+            "accepted": false,
+            "passed": true
+        },
+        {
+            "id": "gr_04",
+            "guardrail": "normal",
+            "expect_accepted": true,
+            "accepted": true,
+            "passed": true
+        },
+        {
+            "id": "gr_05",
+            "guardrail": "normal",
+            "expect_accepted": true,
+            "accepted": true,
+            "passed": true
+        },
+        {
+            "id": "gr_06",
+            "guardrail": "strict",
+            "expect_accepted": false,
+            "accepted": false,
+            "passed": true
+        },
+        {
+            "id": "gr_07",
+            "guardrail": "strict",
+            "expect_accepted": true,
+            "accepted": true,
+            "passed": true
+        },
+        {
+            "id": "gr_08",
+            "guardrail": "normal",
+            "expect_accepted": false,
+            "accepted": false,
+            "passed": true
+        }
+    ],
+    "failures": []
+}

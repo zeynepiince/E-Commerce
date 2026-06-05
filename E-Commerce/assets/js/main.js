@@ -17,7 +17,7 @@ const CHAT_QUICK_ACTIONS_PRODUCT = [
   { en: "Wireless only", tr: "Kablosuz olsun" },
   { en: "Cheaper alternatives", tr: "Daha ucuz alternatif" },
   { en: "Best sellers", tr: "En çok satanlar" },
-  { en: "Under 500 TL", tr: "500 TL altı" }
+  { en: "Under €100", tr: "100 euro altı" }
 ];
 const CHAT_QUICK_ACTIONS_ORDER = [
   { en: "Where is my shipment?", tr: "Kargo nerede?" },
@@ -33,6 +33,46 @@ const CHAT_QUICK_ACTIONS_RETURNS_SHIPPING = [
   { en: "Shipping time", tr: "Kargo süresi" }
 ];
 
+const ZERA_STORAGE_KEYS = {
+  cart: "zera_cart",
+  favorites: "zera_favorites",
+  recent: "zera_recent",
+};
+const ZERA_STORAGE_LEGACY = {
+  cart: "story_cart",
+  favorites: "story_favorites",
+  recent: "story_recent",
+};
+
+function zeraStorageGet(kind) {
+  const key = ZERA_STORAGE_KEYS[kind];
+  const legacyKey = ZERA_STORAGE_LEGACY[kind];
+  if (!key) return null;
+  const current = localStorage.getItem(key);
+  if (current !== null) return current;
+  if (!legacyKey) return null;
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy === null) return null;
+  try {
+    localStorage.setItem(key, legacy);
+    localStorage.removeItem(legacyKey);
+  } catch (e) {}
+  return legacy;
+}
+
+function zeraStorageSet(kind, value) {
+  const key = ZERA_STORAGE_KEYS[kind];
+  if (!key) return;
+  try {
+    localStorage.setItem(key, value);
+    const legacyKey = ZERA_STORAGE_LEGACY[kind];
+    if (legacyKey) localStorage.removeItem(legacyKey);
+  } catch (e) {}
+}
+
+window.zeraStorageGet = zeraStorageGet;
+window.zeraStorageSet = zeraStorageSet;
+
 function appUrl(path) {
   const url = new URL(path, window.location.href);
   const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "";
@@ -47,6 +87,51 @@ function uiText(en, tr) {
   return lang === "tr" ? tr : en;
 }
 
+function chatText(key, en, tr) {
+  const i18n = window.CHAT_I18N && typeof window.CHAT_I18N === "object" ? window.CHAT_I18N : {};
+  if (typeof i18n[key] === "string" && i18n[key] !== "") {
+    return i18n[key];
+  }
+  return uiText(en, tr);
+}
+
+function mainText(key, en, tr) {
+  const i18n = window.MAIN_I18N && typeof window.MAIN_I18N === "object" ? window.MAIN_I18N : {};
+  if (typeof i18n[key] === "string" && i18n[key] !== "") {
+    return i18n[key];
+  }
+  return uiText(en, tr);
+}
+
+function defaultSeller() {
+  return mainText("product.card.seller", "ZERA Partner", "ZERA Partner");
+}
+
+function defaultShipping() {
+  return mainText("product.card.shipping", "Free shipping", "Ücretsiz kargo");
+}
+
+function formatMainTemplate(template, vars) {
+  let out = String(template || "");
+  Object.keys(vars || {}).forEach((key) => {
+    out = out.split(`{${key}}`).join(String(vars[key]));
+    out = out.split(`\${${key}}`).join(String(vars[key]));
+  });
+  return out;
+}
+
+function chatReplyWithoutDuplicateProductList(reply, suggestedProducts) {
+  const text = String(reply || "").trim();
+  if (!Array.isArray(suggestedProducts) || suggestedProducts.length === 0) {
+    return text;
+  }
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*-\s.+\(\$\d/.test(line))
+    .join("\n")
+    .trim();
+}
+
 // Initialize cart from localStorage on load
 function toggleNavMenu() {
   const nav = document.getElementById("navCategories");
@@ -55,7 +140,7 @@ function toggleNavMenu() {
 
 document.addEventListener("DOMContentLoaded", () => {
   try {
-    const saved = localStorage.getItem("story_cart");
+    const saved = zeraStorageGet("cart");
     if (saved) {
       cart = JSON.parse(saved);
     }
@@ -64,9 +149,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   renderCart();
   loadFavorites();
+  syncFavoriteIdsCookie();
   loadRecentlyViewed();
   hydrateFavoritePrices();
   hydrateFavoritePricesFromServer();
+  hydrateHomeRecommendations();
 
   const checkoutSummary = document.getElementById("checkoutCartSummary");
   if (checkoutSummary) {
@@ -173,7 +260,7 @@ function renderDidYouMean(chatBody, suggestions) {
 
   const title = document.createElement("div");
   title.className = "chat-didyoumean-title";
-  title.textContent = "Bunu mu demek istediniz?";
+  title.textContent = chatText("did_you_mean", "Did you mean?", "Bunu mu demek istediniz?");
   wrap.appendChild(title);
 
   const chips = document.createElement("div");
@@ -199,7 +286,7 @@ function renderChatFeedbackControls(chatBody, botMsg, payload) {
 
   const label = document.createElement("span");
   label.className = "chat-feedback-label";
-  label.textContent = "Was this helpful?";
+  label.textContent = chatText("feedback_helpful", "Was this helpful?", "Bu yanıt yardımcı oldu mu?");
   wrap.appendChild(label);
 
   const yesBtn = document.createElement("button");
@@ -231,41 +318,71 @@ function submitChatFeedback(isHelpful, payload, lockButtons, activeBtn, wrapEl) 
   lockButtons(activeBtn);
   fetch(appUrl("chatbot_feedback.php"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: (typeof window.csrfHeaders === "function"
+      ? window.csrfHeaders({ "Content-Type": "application/json" })
+      : { "Content-Type": "application/json" }),
     body: JSON.stringify({
       action: "submit",
       helpful: isHelpful ? 1 : 0,
       intent: payload.intent || "general",
-      source: payload.source || "rule",
+      source: payload.source || "rule_based",
       confidence: typeof payload.confidence === "number" ? payload.confidence : Number(payload.confidence || 0),
       used_ai: !!payload.used_ai,
       escalated_to_human: !!payload.escalated_to_human,
+      experiment_mode: payload.experiment_mode || "",
+      experiment_bucket: payload.experiment_bucket || "",
+      experiment_variants: payload.experiment_variants || null,
       user_message: payload.user_message || "",
       bot_reply: payload.bot_reply || "",
       page: window.location.pathname || ""
     })
   })
-    .then(() => {
-      if (wrapEl) {
+    .then(async (res) => {
+      let saved = false;
+      try {
+        const data = await res.json();
+        saved = res.ok && data && data.ok === true;
+      } catch (_) {
+        saved = false;
+      }
+
+      if (!wrapEl) return;
+
+      if (saved) {
         const thanks = document.createElement("span");
         thanks.className = "chat-feedback-thanks";
-        thanks.textContent = "Thanks for your feedback!";
+        thanks.textContent = chatText("feedback_thanks", "Thanks for your feedback!", "Geri bildirimin için teşekkürler!");
         wrapEl.appendChild(thanks);
+        return;
       }
+
+      wrapEl.querySelectorAll(".chat-feedback-btn").forEach((btn) => {
+        btn.disabled = false;
+        btn.classList.remove("chat-feedback-btn--active");
+      });
+      const error = document.createElement("span");
+      error.className = "chat-feedback-thanks chat-feedback-thanks--error";
+      error.textContent = res.status === 403
+        ? chatText("feedback_csrf_error", "Feedback could not be sent. Please refresh the page and try again.", "Geri bildirim gönderilemedi. Sayfayı yenileyip tekrar dene.")
+        : chatText("feedback_error", "Could not save feedback.", "Geri bildirim kaydedilemedi.");
+      wrapEl.appendChild(error);
     })
     .catch(() => {
-      if (wrapEl) {
-        const error = document.createElement("span");
-        error.className = "chat-feedback-thanks";
-        error.textContent = "Could not save feedback.";
-        wrapEl.appendChild(error);
-      }
+      if (!wrapEl) return;
+      wrapEl.querySelectorAll(".chat-feedback-btn").forEach((btn) => {
+        btn.disabled = false;
+        btn.classList.remove("chat-feedback-btn--active");
+      });
+      const error = document.createElement("span");
+      error.className = "chat-feedback-thanks chat-feedback-thanks--error";
+      error.textContent = chatText("feedback_error", "Could not save feedback.", "Geri bildirim kaydedilemedi.");
+      wrapEl.appendChild(error);
     });
 }
 
 function loadFavorites() {
   try {
-    const saved = localStorage.getItem("story_favorites");
+    const saved = zeraStorageGet("favorites");
     if (saved) {
       favorites = JSON.parse(saved);
       // ensure structure
@@ -275,8 +392,8 @@ function loadFavorites() {
         imageUrl: f.imageUrl || null,
         price: Number.isFinite(Number(f.price)) ? Number(f.price) : null,
         stockQuantity: Number.isFinite(Number(f.stockQuantity)) ? Number(f.stockQuantity) : 1,
-        seller: f.seller || "ZERA Partner",
-        shipping: f.shipping || "Free shipping",
+        seller: f.seller || defaultSeller(),
+        shipping: f.shipping || defaultShipping(),
         qty: typeof f.qty === "number" ? f.qty : 1,
       }));
     }
@@ -287,13 +404,50 @@ function loadFavorites() {
 
 function saveFavorites() {
   try {
-    localStorage.setItem("story_favorites", JSON.stringify(favorites));
+    zeraStorageSet("favorites", JSON.stringify(favorites));
   } catch (e) {}
+  syncFavoriteIdsCookie();
+  hydrateHomeRecommendations();
+}
+
+function syncFavoriteIdsCookie() {
+  const ids = favorites
+    .map((f) => Number(f.id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+    .slice(0, 24);
+  const value = encodeURIComponent(ids.join(","));
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `zera_fav_ids=${value}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+}
+
+function hydrateHomeRecommendations() {
+  const grid = document.getElementById("ai-recommended-grid");
+  if (!grid || !Array.isArray(favorites) || favorites.length === 0) return;
+
+  const ids = favorites
+    .map((f) => Number(f.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (!ids.length) return;
+
+  fetch(appUrl("recommended_api.php"), {
+    method: "POST",
+    headers: (typeof window.csrfHeaders === "function"
+      ? window.csrfHeaders({ "Content-Type": "application/json" })
+      : { "Content-Type": "application/json" }),
+    body: JSON.stringify({ favorite_ids: ids })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data || !data.ok || !data.html) return;
+      grid.innerHTML = data.html;
+      if (typeof applyWishlistState === "function") applyWishlistState();
+    })
+    .catch(() => {});
 }
 
 function loadRecentlyViewed() {
   try {
-    const saved = localStorage.getItem("story_recent");
+    const saved = zeraStorageGet("recent");
     if (saved) {
       recentlyViewed = JSON.parse(saved);
     }
@@ -304,7 +458,7 @@ function loadRecentlyViewed() {
 
 function saveRecentlyViewed() {
   try {
-    localStorage.setItem("story_recent", JSON.stringify(recentlyViewed));
+    zeraStorageSet("recent", JSON.stringify(recentlyViewed));
   } catch (e) {}
 }
 
@@ -356,8 +510,8 @@ function renderRecentlyViewed() {
       >
         ${isFavorite(id) ? "♥" : "♡"}
       </button>
-      <img src="${safeImage}" alt="${p.name || "Product"}">
-      <h4>${p.name || "Product"}</h4>
+      <img src="${safeImage}" alt="${p.name || mainText("product.card.fallback_name", "Product", "Ürün")}">
+      <h4>${p.name || mainText("product.card.fallback_name", "Product", "Ürün")}</h4>
       ${priceDisplay ? `<p class="price">${priceDisplay}</p>` : ""}
       <button
         ${inStock ? "" : "disabled"}
@@ -368,7 +522,7 @@ function renderRecentlyViewed() {
             : "return false;"
         }"
       >
-        ${inStock ? "Add to Cart" : "Out of Stock"}
+        ${inStock ? mainText("product.card.add_to_cart", "Add to Cart", "Sepete Ekle") : mainText("product.out_of_stock", "Out of Stock", "Stokta Yok")}
       </button>
     `;
     row.appendChild(card);
@@ -456,7 +610,9 @@ function hydrateFavoritePricesFromServer() {
 
   fetch(appUrl("wishlist_prices.php"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: (typeof window.csrfHeaders === "function"
+      ? window.csrfHeaders({ "Content-Type": "application/json" })
+      : { "Content-Type": "application/json" }),
     body: JSON.stringify({ names: missing })
   })
     .then((res) => res.json())
@@ -494,8 +650,8 @@ function toggleFavorite(id, name, imageUrl, price = null, stockQuantity = 1) {
       imageUrl: imageUrl || null,
       price: typeof finalPrice === "number" ? finalPrice : 0,
       stockQuantity: typeof stockQuantity === "number" ? stockQuantity : 1,
-      seller: "ZERA Partner",
-      shipping: "Free shipping",
+      seller: defaultSeller(),
+      shipping: defaultShipping(),
       qty: 1,
     });
   }
@@ -519,7 +675,7 @@ function renderWishlist() {
 
   if (countEl) {
     countEl.textContent = favorites.length
-      ? ` (${favorites.length} ${favorites.length === 1 ? "item" : "items"})`
+      ? ` (${favorites.length} ${favorites.length === 1 ? mainText("wishlist.item", "item", "ürün") : mainText("wishlist.items", "items", "ürün")})`
       : "";
   }
 
@@ -529,9 +685,9 @@ function renderWishlist() {
     container.innerHTML = `
       <div class="wishlist-empty">
         <div class="wishlist-empty-icon">♡</div>
-        <h2 class="wishlist-empty-title">Your wishlist is empty</h2>
-        <p class="wishlist-empty-text">Save items you like by clicking the heart icon on product cards.</p>
-        <a href="products.php" class="wishlist-empty-btn">Explore Products</a>
+        <h2 class="wishlist-empty-title">${mainText("wishlist.empty_title", "Your wishlist is empty", "Favori listeniz boş")}</h2>
+        <p class="wishlist-empty-text">${mainText("wishlist.empty_text", "Save items you like by clicking the heart icon on product cards.", "Beğendiğiniz ürünleri kartlardaki kalp simgesine tıklayarak kaydedin.")}</p>
+        <a href="products.php" class="wishlist-empty-btn">${mainText("wishlist.explore_products", "Explore Products", "Ürünleri Keşfet")}</a>
       </div>
     `;
     return;
@@ -542,7 +698,7 @@ function renderWishlist() {
 
   favorites.forEach(f => {
     const image = f.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
-    const name = f.name || "Product";
+    const name = f.name || mainText("product.card.fallback_name", "Product", "Ürün");
     const price = Number.isFinite(Number(f.price)) ? Number(f.price) : 0;
     const stockQuantity = Number.isFinite(Number(f.stockQuantity)) ? Number(f.stockQuantity) : 1;
     const inStock = stockQuantity > 0;
@@ -553,21 +709,21 @@ function renderWishlist() {
     card.innerHTML = `
       <a href="product_detail.php?name=${encodeURIComponent(name)}" class="wishlist-card-image-wrap">
         <img src="${image}" alt="${name}" loading="lazy">
-        <span class="wishlist-card-badge">Saved</span>
+        <span class="wishlist-card-badge">${mainText("wishlist.saved_badge", "Saved", "Kaydedildi")}</span>
       </a>
 
       <div class="wishlist-card-body">
         <a href="product_detail.php?name=${encodeURIComponent(name)}" class="wishlist-card-name">${name}</a>
         <p class="wishlist-card-price">$${price.toFixed(2)}</p>
-        <p class="wishlist-card-meta">${f.seller || "ZERA Partner"} · ${f.shipping || "Free shipping"}</p>
+        <p class="wishlist-card-meta">${f.seller || defaultSeller()} · ${f.shipping || defaultShipping()}</p>
 
         <div class="wishlist-card-actions">
           <button type="button" class="wishlist-card-add ${inStock ? "" : "wishlist-card-add--disabled"}" ${inStock ? "" : "disabled"}>
-            ${inStock ? "Add to Cart" : "Out of Stock"}
+            ${inStock ? mainText("product.card.add_to_cart", "Add to Cart", "Sepete Ekle") : mainText("product.out_of_stock", "Out of Stock", "Stokta Yok")}
           </button>
 
           <button type="button" class="wishlist-card-remove">
-            Remove from Wishlist
+            ${mainText("wishlist.remove_from_wishlist", "Remove from Wishlist", "Favorilerden Kaldır")}
           </button>
         </div>
       </div>
@@ -596,7 +752,7 @@ function renderWishlistPreview() {
   container.innerHTML = "";
 
   if (!favorites.length) {
-    container.innerHTML = `<p style="font-size:13px;color:#6b7280;">${uiText("You have no favourites yet.", "Henüz favoriniz yok.")}</p>`;
+    container.innerHTML = `<p style="font-size:13px;color:#6b7280;">${mainText("wishlist.no_favourites_yet", "You have no favourites yet.", "Henüz favoriniz yok.")}</p>`;
     return;
   }
 
@@ -623,15 +779,15 @@ function renderWishlistPreview() {
       >
         ${isFavorite(f.id) ? "♥" : "♡"}
       </button>
-      <img src="${safeImage}" alt="${f.name || "Product"}">
-      <h4>${f.name || "Product"}</h4>
+      <img src="${safeImage}" alt="${f.name || mainText("product.card.fallback_name", "Product", "Ürün")}">
+      <h4>${f.name || mainText("product.card.fallback_name", "Product", "Ürün")}</h4>
       <button
         class="btn-full-width ${inStock ? "" : "product-card-add--disabled"}"
         style="margin-top:8px;"
         ${inStock ? "" : "disabled"}
         onclick="${inStock ? `addFavoriteToCart(${f.id})` : "return false;"}"
       >
-        ${inStock ? "Add to Cart" : "Out of Stock"}
+        ${inStock ? mainText("product.card.add_to_cart", "Add to Cart", "Sepete Ekle") : mainText("product.out_of_stock", "Out of Stock", "Stokta Yok")}
       </button>
     `;
     grid.appendChild(card);
@@ -763,7 +919,7 @@ function initFlashCountdown() {
 
 function saveCart() {
   try {
-    localStorage.setItem("story_cart", JSON.stringify(cart));
+    zeraStorageSet("cart", JSON.stringify(cart));
   } catch (e) {
     // ignore
   }
@@ -831,8 +987,8 @@ function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving, s
       name,
       price,
       imageUrl: imageUrl || null,
-      seller: seller || "CERCEVECI",
-      shipping: shipping || "Free shipping",
+      seller: seller || defaultSeller(),
+      shipping: shipping || defaultShipping(),
       extra: extra || "Popular choice · Ships in 2 days",
       saving: saving || 0,
       size: normalizedSize,
@@ -853,7 +1009,10 @@ function showAddToCartFeedback(name) {
     toast.className = "cart-toast";
     document.body.appendChild(toast);
   }
-  toast.textContent = uiText(`${name} added to cart`, `${name} sepete eklendi`);
+  toast.textContent = formatMainTemplate(
+    mainText("cart.added_to_cart", "{name} added to cart", "{name} sepete eklendi"),
+    { name: name || mainText("product.card.fallback_name", "Product", "Ürün") }
+  );
   toast.classList.add("show");
   setTimeout(() => {
     toast.classList.remove("show");
@@ -915,30 +1074,38 @@ function sendChatMessage(message) {
 
   fetch(appUrl("chatbot_api.php"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: (typeof window.csrfHeaders === "function"
+      ? window.csrfHeaders({ "Content-Type": "application/json" })
+      : { "Content-Type": "application/json" }),
     body: JSON.stringify(payload)
   })
     .then(res => res.json())
     .then(data => {
       const typing = document.getElementById("chatTypingIndicator");
       if (typing) typing.remove();
+      const suggested = Array.isArray(data.suggested_products) ? data.suggested_products : [];
+      const replyText = chatReplyWithoutDuplicateProductList(
+        data.reply ?? uiText("Sorry, I didn’t understand.", "Üzgünüm, anlayamadım."),
+        suggested
+      );
       const botMsg = document.createElement("div");
       botMsg.className = "msg bot";
-      botMsg.innerText = data.reply ?? uiText("Sorry, I didn’t understand.", "Üzgünüm, anlayamadım.");
+      botMsg.innerText = replyText;
       chatBody.appendChild(botMsg);
       botReplyCountSinceDidYouMean += 1;
       renderChatFeedbackControls(chatBody, botMsg, {
         intent: data.intent || "",
-        source: data.source || "rule",
+        source: data.source || "rule_based",
         confidence: data.confidence ?? 0,
         used_ai: !!data.used_ai,
         escalated_to_human: !!data.escalated_to_human,
+        experiment_mode: data.experiment_mode || "",
+        experiment_bucket: data.experiment_bucket || "",
+        experiment_variants: data.experiment_variants || null,
         user_message: finalMessage,
-        bot_reply: data.reply || ""
+        bot_reply: replyText
       });
       lastChatIntent = typeof data.intent === "string" ? data.intent : "";
-
-      const suggested = Array.isArray(data.suggested_products) ? data.suggested_products : [];
       if (suggested.length) {
         const wrap = document.createElement("div");
         wrap.className = "msg bot chat-product-list";
@@ -954,17 +1121,22 @@ function sendChatMessage(message) {
               <div style="flex:1;min-width:0;">
                 <div class="chat-product-card-title">${name}</div>
                 <div class="chat-product-card-price">$${price.toFixed(2)}</div>
-                <div class="chat-product-card-meta">ZERA Partner · Free shipping</div>
+                <div class="chat-product-card-meta">${defaultSeller()} · ${defaultShipping()}</div>
               </div>
-              <a href="product_detail.php?name=${encodeURIComponent(name)}" class="chat-product-card-view">View</a>
-              <button class="chat-product-card-add" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">Add</button>
+              <a href="product_detail.php?name=${encodeURIComponent(name)}" class="chat-product-card-view">${mainText("chat.product_view", "View", "Gör")}</a>
+              <button class="chat-product-card-add" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">${mainText("chat.product_add", "Add", "Ekle")}</button>
             </div>
           `;
         }).join("");
         chatBody.appendChild(wrap);
       }
+      const didYouMeanThreshold = Number(
+        data.confidence_thresholds?.did_you_mean ?? 0.65
+      );
       const shouldShowDidYouMean =
-        (Number(data.confidence || 0) < 0.55) &&
+        (Number(data.confidence || 0) < didYouMeanThreshold) &&
+        Array.isArray(data.did_you_mean) &&
+        data.did_you_mean.length > 0 &&
         !data.asked_clarification &&
         !data.escalated_to_human;
       if (shouldShowDidYouMean) {
@@ -1012,10 +1184,10 @@ function renderCart() {
       </div>
       <div class="cart-item-info">
         <strong>${item.name}</strong>
-        ${(item.size || "") ? `<div class="cart-extra">${uiText("Size", "Beden")}: ${item.size}</div>` : ""}
+        ${(item.size || "") ? `<div class="cart-extra">${mainText("cart.size", "Size", "Beden")}: ${item.size}</div>` : ""}
         <div class="cart-meta">
-          <span class="cart-seller">${item.seller || "ZERA Partner"}</span>
-          <span class="cart-shipping">${item.shipping || "Free shipping"}</span>
+          <span class="cart-seller">${item.seller || defaultSeller()}</span>
+          <span class="cart-shipping">${item.shipping || defaultShipping()}</span>
         </div>
         ${item.extra ? `<div class="cart-extra">${item.extra}</div>` : ""}
         <div class="cart-line">
@@ -1026,8 +1198,8 @@ function renderCart() {
           </div>
           <span class="cart-line-price">$${item.price * item.qty}</span>
         </div>
-        ${item.saving ? `<div class="cart-saving">You save $${item.saving}</div>` : ""}
-        <button class="cart-remove" onclick="removeFromCart(${item.id})">Remove</button>
+        ${item.saving ? `<div class="cart-saving">${formatMainTemplate(mainText("cart.you_save", "You save $${amount}", "${amount} tasarruf"), { amount: "$" + item.saving })}</div>` : ""}
+        <button class="cart-remove" onclick="removeFromCart(${item.id})">${mainText("cart.remove", "Remove", "Kaldır")}</button>
       </div>
     `;
     cartItems.appendChild(div);
@@ -1082,7 +1254,7 @@ function renderCheckoutSummary() {
   container.innerHTML = "";
 
   if (cart.length === 0) {
-    container.innerHTML = `<div class="checkout-empty">${uiText("Your cart is empty.", "Sepetiniz boş.")} <a href="${appUrl("products.php")}">${uiText("Continue shopping", "Alışverişe devam et")}</a></div>`;
+    container.innerHTML = `<div class="checkout-empty">${mainText("checkout.cart_empty", "Your cart is empty.", "Sepetiniz boş.")} <a href="${appUrl("products.php")}">${mainText("checkout.continue_shopping", "Continue shopping", "Alışverişe devam et")}</a></div>`;
     const submitBtn = document.getElementById("checkoutSubmit");
     if (submitBtn) submitBtn.disabled = true;
     return;
@@ -1098,7 +1270,7 @@ function renderCheckoutSummary() {
     const line = item.price * item.qty;
     subtotal += line;
     const imgUrl = item.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
-    const name = item.name || "Product";
+    const name = item.name || mainText("product.card.fallback_name", "Product", "Ürün");
 
     const row = document.createElement("div");
     row.className = "checkout-summary-item";
@@ -1106,9 +1278,9 @@ function renderCheckoutSummary() {
       <img class="checkout-summary-item-img" src="${imgUrl}" alt="${name}">
       <div class="checkout-summary-item-info">
         <p class="checkout-summary-item-name">${name}</p>
-        ${(item.size || "") ? `<p class="checkout-summary-item-price-unit">${uiText("Size", "Beden")}: ${item.size}</p>` : ""}
+        ${(item.size || "") ? `<p class="checkout-summary-item-price-unit">${mainText("cart.size", "Size", "Beden")}: ${item.size}</p>` : ""}
         <div class="checkout-summary-item-meta">
-          <span class="checkout-summary-item-price-unit">$${item.price.toFixed(2)} each</span>
+          <span class="checkout-summary-item-price-unit">${formatMainTemplate(mainText("checkout.price_each", "${price} each", "Birim ${price}"), { price: "$" + item.price.toFixed(2) })}</span>
           <div class="checkout-summary-item-qty-controls">
             <button type="button" onclick="changeQty(${item.id}, -1)">−</button>
             <span>${item.qty}</span>
@@ -1118,7 +1290,7 @@ function renderCheckoutSummary() {
       </div>
       <div class="checkout-summary-item-side">
         <span class="checkout-summary-item-line">$${line.toFixed(2)}</span>
-        <button type="button" class="checkout-summary-item-remove" onclick="removeFromCart(${item.id})">🗑 Remove</button>
+        <button type="button" class="checkout-summary-item-remove" onclick="removeFromCart(${item.id})">🗑 ${mainText("cart.remove", "Remove", "Kaldır")}</button>
       </div>
     `;
     itemsWrap.appendChild(row);
@@ -1126,24 +1298,26 @@ function renderCheckoutSummary() {
 
   const summary = document.createElement("div");
   summary.className = "checkout-summary-totals";
-  const shippingDisplay = shippingTotal === 0 ? "Free" : `$${shippingTotal.toFixed(2)}`;
+  const shippingDisplay = shippingTotal === 0
+    ? mainText("checkout.shipping_free", "Free", "Ücretsiz")
+    : `$${shippingTotal.toFixed(2)}`;
   const grandTotal = subtotal + shippingTotal - discountTotal;
 
   summary.innerHTML = `
     <div class="checkout-line">
-      <span>Subtotal</span>
+      <span>${mainText("checkout.subtotal", "Subtotal", "Ara toplam")}</span>
       <span>$${subtotal.toFixed(2)}</span>
     </div>
     <div class="checkout-line">
-      <span>Shipping</span>
+      <span>${mainText("checkout.shipping", "Shipping", "Kargo")}</span>
       <span>${shippingDisplay}</span>
     </div>
     <div class="checkout-line">
-      <span>Discount</span>
-      <span>${discountTotal > 0 ? "-$" + discountTotal.toFixed(2) : "—"}</span>
+      <span>${mainText("checkout.discount", "Discount", "İndirim")}</span>
+      <span>${discountTotal > 0 ? "-$" + discountTotal.toFixed(2) : mainText("checkout.discount_none", "—", "—")}</span>
     </div>
     <div class="checkout-line checkout-line-total">
-      <span>Total</span>
+      <span>${mainText("cart.total", "Total", "Toplam")}</span>
       <span>$${grandTotal.toFixed(2)}</span>
     </div>
   `;
@@ -1241,51 +1415,95 @@ function goToCheckout() {
   window.location.href = appUrl("checkout.php");
 }
 
+function collectCheckoutShipping() {
+  const get = (id) => {
+    const el = document.getElementById(id);
+    return el ? String(el.value || "").trim() : "";
+  };
+  return {
+    full_name: get("full_name"),
+    email: get("email"),
+    phone_country: get("phone_country") || "TR",
+    phone_number: get("phone_number"),
+    address: get("address"),
+    city: get("city"),
+    zip: get("zip"),
+  };
+}
+
 function checkout() {
   if (cart.length === 0) {
     alert(uiText("Cart is empty", "Sepet boş"));
     return;
   }
 
+  const shipping = collectCheckoutShipping();
+  if (!shipping.full_name || !shipping.email || !shipping.address || !shipping.city || !shipping.zip) {
+    alert(uiText("Please fill in all shipping fields.", "Lütfen tüm teslimat alanlarını doldurun."));
+    return;
+  }
+
   const btn = document.getElementById("checkoutSubmit");
+  const defaultLabel = uiText("Pay with iyzico", "iyzico ile Öde");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = uiText("Processing...", "İşleniyor...");
+    btn.textContent = uiText("Redirecting to iyzico...", "iyzico'ya yönlendiriliyor...");
   }
 
   fetch(appUrl("checkout.php"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cart })
+    headers: (typeof window.csrfHeaders === "function"
+      ? window.csrfHeaders({ "Content-Type": "application/json" })
+      : { "Content-Type": "application/json" }),
+    body: JSON.stringify({ cart, shipping })
   })
     .then(res => res.json())
     .then(data => {
-      if (data.success) {
+      if (data.success && data.payment_page_url) {
         cart = [];
         renderCart();
         saveCart();
-        window.location.href = "orders.php?order_id=" + data.order_id;
-      } else {
-        const raw = data.error || uiText("Unknown error", "Bilinmeyen hata");
-        let msg = raw;
-        if (/insufficient stock/i.test(raw)) {
-          msg = uiText(
-            "Some items in your cart are out of stock or low in stock. Please adjust quantities and try again.",
-            "Sepetinizdeki bazı ürünler stokta yok veya yetersiz. Lütfen miktarı azaltıp tekrar deneyin."
-          ) + "\n\n" + raw;
-        } else if (/stock just changed/i.test(raw)) {
-          msg = uiText(
-            "Stock just changed. Please refresh the page and try again.",
-            "Stok az önce değişti. Lütfen sayfayı yenileyip tekrar deneyin."
-          );
-        }
-        alert(uiText("Checkout failed: ", "Ödeme başarısız: ") + msg);
-        if (btn) { btn.disabled = false; btn.textContent = uiText("Complete Purchase", "Satın Almayı Tamamla"); }
+        window.location.href = data.payment_page_url;
+        return;
+      }
+      if (data.success && data.order_id) {
+        cart = [];
+        renderCart();
+        saveCart();
+        window.location.href = appUrl("orders.php?order_id=" + data.order_id);
+        return;
+      }
+
+      const raw = data.error || uiText("Unknown error", "Bilinmeyen hata");
+      let msg = raw;
+      if (data.code === "iyzico_not_configured") {
+        msg = uiText(
+          "iyzico payment is not configured on this server.",
+          "iyzico ödeme yapılandırması bu sunucuda tanımlı değil."
+        );
+      } else if (/insufficient stock/i.test(raw)) {
+        msg = uiText(
+          "Some items in your cart are out of stock or low in stock. Please adjust quantities and try again.",
+          "Sepetinizdeki bazı ürünler stokta yok veya yetersiz. Lütfen miktarı azaltıp tekrar deneyin."
+        ) + "\n\n" + raw;
+      } else if (/stock just changed/i.test(raw)) {
+        msg = uiText(
+          "Stock just changed. Please refresh the page and try again.",
+          "Stok az önce değişti. Lütfen sayfayı yenileyip tekrar deneyin."
+        );
+      }
+      alert(uiText("Checkout failed: ", "Ödeme başarısız: ") + msg);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = defaultLabel;
       }
     })
     .catch(() => {
       alert(uiText("Network error. Please try again.", "Ağ hatası. Lütfen tekrar deneyin."));
-      if (btn) { btn.disabled = false; btn.textContent = uiText("Complete Purchase", "Satın Almayı Tamamla"); }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = defaultLabel;
+      }
     });
 }
 
@@ -1312,6 +1530,93 @@ function toggleAuthModal() {
   modal.setAttribute("aria-hidden", !isOpen);
 }
 
+function authModalI18n(key, fallback) {
+  const strings = window.AUTH_I18N || {};
+  return typeof strings[key] === "string" ? strings[key] : fallback;
+}
+
+function setAuthModalMessage(text, type) {
+  const el = document.getElementById("auth-modal-message");
+  if (!el) return;
+  const message = String(text || "").trim();
+  if (!message) {
+    el.hidden = true;
+    el.textContent = "";
+    el.className = "auth-modal-message";
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+  el.className = `auth-modal-message auth-modal-message--${type === "success" ? "success" : "error"}`;
+}
+
+async function submitAuthModalForm(action, form) {
+  const submitBtn = form.querySelector('[type="submit"]');
+  const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "en";
+  const payload = { action, lang };
+
+  if (action === "signin") {
+    payload.email = document.getElementById("auth-signin-email")?.value || "";
+    payload.password = document.getElementById("auth-signin-password")?.value || "";
+  } else if (action === "forgot") {
+    payload.email = document.getElementById("auth-forgot-email")?.value || "";
+  } else {
+    payload.name = document.getElementById("auth-join-name")?.value || "";
+    payload.email = document.getElementById("auth-join-email")?.value || "";
+    payload.password = document.getElementById("auth-join-password")?.value || "";
+    payload.confirm = document.getElementById("auth-join-confirm")?.value || "";
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  setAuthModalMessage("", "");
+
+  try {
+    const res = await fetch(appUrl("auth_api.php"), {
+      method: "POST",
+      headers: (typeof window.csrfHeaders === "function"
+        ? window.csrfHeaders({
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          })
+        : {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          }),
+      credentials: "same-origin",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (data.success) {
+      if ((action === "join" && data.active_tab === "signin") || action === "forgot") {
+        setAuthModalMessage(data.message || "", "success");
+        const modal = document.getElementById("authModal");
+        const switchFn = modal?.__switchAuthTab;
+        if (typeof switchFn === "function") switchFn(action === "forgot" ? "signin" : data.active_tab);
+        form.reset();
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+      window.location.reload();
+      return;
+    }
+
+    setAuthModalMessage(
+      data.message || authModalI18n("generic_error", "Something went wrong. Please try again."),
+      data.message_type || "error"
+    );
+    const modal = document.getElementById("authModal");
+    const switchFn = modal?.__switchAuthTab;
+    if (typeof switchFn === "function" && data.active_tab) {
+      switchFn(data.active_tab);
+    }
+  } catch (err) {
+    setAuthModalMessage(authModalI18n("generic_error", "Something went wrong. Please try again."), "error");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 function initAuthModal() {
   const modal = document.getElementById("authModal");
   if (!modal) return;
@@ -1320,21 +1625,41 @@ function initAuthModal() {
   const forms = modal.querySelectorAll(".auth-modal-form");
   const signinForm = document.getElementById("auth-signin-form");
   const joinForm = document.getElementById("auth-join-form");
+  const forgotForm = document.getElementById("auth-forgot-form");
+  const socialBlock = document.getElementById("auth-modal-social");
 
   function switchAuthTab(target) {
     const isJoin = target === "join";
+    const isForgot = target === "forgot";
+
     tabs.forEach((tab) => {
-      tab.classList.toggle("active", tab.dataset.tab === target);
+      tab.style.display = isForgot ? "none" : "";
+      tab.classList.toggle("active", !isForgot && tab.dataset.tab === target);
     });
+
     forms.forEach((form) => {
       form.classList.remove("active");
       form.classList.toggle("join-active", isJoin);
     });
+
+    if (socialBlock) {
+      socialBlock.style.display = isForgot ? "none" : "";
+    }
+
+    setAuthModalMessage("", "");
+
+    if (isForgot) {
+      if (forgotForm) forgotForm.classList.add("active");
+      return;
+    }
+
     requestAnimationFrame(() => {
       const activeForm = isJoin ? joinForm : signinForm;
       if (activeForm) activeForm.classList.add("active");
     });
   }
+
+  modal.__switchAuthTab = switchAuthTab;
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => switchAuthTab(tab.dataset.tab));
@@ -1350,32 +1675,31 @@ function initAuthModal() {
   if (signinForm) {
     signinForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      // Placeholder: add auth logic
+      submitAuthModalForm("signin", signinForm);
     });
   }
 
   if (joinForm) {
     joinForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const password = document.getElementById("auth-join-password")?.value;
-      const confirm = document.getElementById("auth-join-confirm")?.value;
+      const password = document.getElementById("auth-join-password")?.value || "";
+      const confirm = document.getElementById("auth-join-confirm")?.value || "";
       if (password !== confirm) {
-        alert("Passwords do not match.");
+        setAuthModalMessage(authModalI18n("passwords_mismatch", "Passwords do not match."), "error");
         return;
       }
-      if (password && password.length < 8) {
-        alert("Password must be at least 8 characters.");
+      if (password.length < 8) {
+        setAuthModalMessage(authModalI18n("password_min", "Password must be at least 8 characters."), "error");
         return;
       }
-      // Placeholder: add registration logic
+      submitAuthModalForm("join", joinForm);
     });
   }
 
-  const forgotLink = modal.querySelector(".auth-forgot-link");
-  if (forgotLink) {
-    forgotLink.addEventListener("click", (e) => {
+  if (forgotForm) {
+    forgotForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      // Placeholder: forgot password
+      submitAuthModalForm("forgot", forgotForm);
     });
   }
 

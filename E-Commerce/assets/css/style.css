@@ -996,6 +996,10 @@ body.cart-open .chat-toggle{
   color:#16a34a;
 }
 
+.chat-feedback-thanks--error{
+  color:#dc2626;
+}
+
 .cart-toast{
   position:fixed;
   top:86px;

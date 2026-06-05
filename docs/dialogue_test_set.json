@@ -1,0 +1,651 @@
+{
+  "version": "1.0",
+  "description": "Multi-turn dialogue scenarios for end-to-end ZERA chatbot evaluation (intent + reply correctness). Rule-based path; no OpenAI.",
+  "metrics": [
+    "turn_intent_accuracy",
+    "turn_reply_accuracy",
+    "scenario_success_rate",
+    "grounding_stock_db",
+    "grounding_sizes_product",
+    "grounding_policy",
+    "grounding_prices"
+  ],
+  "scenarios": [
+    {
+      "id": "dlg_01",
+      "name": "EN tshirt → size S → stock",
+      "description": "Product search then size and stock follow-ups on last suggested product.",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "I want to buy tshirt",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 1,
+            "product_name_contains": "tshirt",
+            "reply_contains": ["$"],
+            "reply_not_contains": ["Happy to help. You can ask about product recommendations"],
+            "grounding": {"prices_match_products": true}
+          }
+        },
+        {
+          "user": "does it have Size S",
+          "expect": {
+            "intent": "product_followup",
+            "source": "product_followup",
+            "reply_contains": ["size S", "available"],
+            "reply_not_contains": ["Happy to help. You can ask about product recommendations", "Could you add a bit more detail"],
+            "grounding": {"sizes_match_product": true, "requested_size": "S"}
+          }
+        },
+        {
+          "user": "stock?",
+          "expect": {
+            "intent": "product_followup",
+            "source": "product_followup",
+            "reply_contains": ["in stock"],
+            "reply_not_contains": ["out of stock", "Happy to help. You can ask about product recommendations"],
+            "grounding": {"stock_matches_db": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_02",
+      "name": "TR tişört → S beden → stok",
+      "description": "Turkish multi-turn product follow-up.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "tshirt almak istiyorum",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 1,
+            "reply_contains": ["$"],
+            "grounding": {"prices_match_products": true}
+          }
+        },
+        {
+          "user": "S beden var mı",
+          "expect": {
+            "intent": "product_followup",
+            "source": "product_followup",
+            "reply_contains": ["S", "beden"],
+            "reply_not_contains": ["Memnuniyetle yardımcı olurum"],
+            "grounding": {"sizes_match_product": true, "requested_size": "S"}
+          }
+        },
+        {
+          "user": "stokta mı",
+          "expect": {
+            "intent": "product_followup",
+            "source": "product_followup",
+            "reply_contains": ["stokta"],
+            "reply_not_contains": ["stokta yok"],
+            "grounding": {"stock_matches_db": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_03",
+      "name": "EN product search then cheaper refinement",
+      "description": "Follow-up refines previous product search with cheaper constraint.",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "show me wireless headphones",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Happy to help. You can ask about product recommendations"],
+            "grounding": {"prices_match_products": true}
+          }
+        },
+        {
+          "user": "show cheaper ones",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Happy to help. You can ask about product recommendations"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_04",
+      "name": "EN shipping policy",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "how long does shipping take",
+          "expect": {
+            "intent": "shipping",
+            "source": "rule_based",
+            "reply_contains": ["ship", "day"],
+            "reply_not_contains": ["Here are some good options"],
+            "grounding": {"policy_intent": "shipping"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_05",
+      "name": "TR return policy",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "iade koşulları neler",
+          "expect": {
+            "intent": "returns",
+            "source": "rule_based",
+            "reply_contains": ["iade"],
+            "reply_not_contains": ["Here are some good options", "Şunlara göz atabilirsin"],
+            "grounding": {"policy_intent": "returns"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_06",
+      "name": "EN order status guest",
+      "description": "Without login, order lookup should ask to sign in.",
+      "lang": "en",
+      "user_id": null,
+      "turns": [
+        {
+          "user": "where is my order",
+          "expect": {
+            "intent": "order_status",
+            "source": "order_lookup",
+            "reply_contains": ["sign in"],
+            "reply_not_contains": ["Your recent orders", "pending"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_07",
+      "name": "EN order status logged-in user",
+      "lang": "en",
+      "user_id": 2,
+      "turns": [
+        {
+          "user": "track my orders",
+          "expect": {
+            "intent": "order_status",
+            "source": "order_lookup",
+            "reply_contains": ["#", "pending"],
+            "reply_not_contains": ["sign in"]
+          }
+        },
+        {
+          "user": "order #20",
+          "expect": {
+            "intent": "order_status",
+            "source": "order_lookup",
+            "reply_contains": ["#20", "pending"],
+            "reply_not_contains": ["sign in"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_08",
+      "name": "EN stock question without product context",
+      "description": "Isolated stock utterance must not hallucinate a product answer.",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "stock?",
+          "expect": {
+            "intent": "general",
+            "reply_not_contains": ["is in stock", "is currently out of stock", "units available"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_09",
+      "name": "EN greeting",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "hello",
+          "expect": {
+            "intent": "general",
+            "reply_not_contains": ["Here are some good options", "- "]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_10",
+      "name": "EN payment methods",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "what payment methods do you accept",
+          "expect": {
+            "intent": "payment",
+            "source": "rule_based",
+            "reply_contains": ["pay", "card"],
+            "reply_not_contains": ["Here are some good options"],
+            "grounding": {"policy_intent": "payment"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_11",
+      "name": "EN size follow-up preserves product memory",
+      "description": "After product search, size question must reference the same product family.",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "I want to buy tshirt",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "product_name_contains": "tshirt"
+          }
+        },
+        {
+          "user": "what sizes are available",
+          "expect": {
+            "intent": "product_followup",
+            "source": "product_followup",
+            "reply_contains": ["Sizes:", "S", "M", "L"],
+            "reply_not_contains": ["Happy to help. You can ask about product recommendations"],
+            "grounding": {"sizes_match_product": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_12",
+      "name": "TR order status guest",
+      "lang": "tr",
+      "user_id": null,
+      "turns": [
+        {
+          "user": "siparişim nerede",
+          "expect": {
+            "intent": "order_status",
+            "source": "order_lookup",
+            "reply_contains": ["giriş"],
+            "reply_not_contains": ["Son siparişlerin", "pending"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_15",
+      "name": "TR etek/elbise — katalogda yok, rastgele ürün yok",
+      "description": "Skirt/dress queries must not fall back to featured unrelated products.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "etek",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["etek bulamadım"],
+            "reply_not_contains": ["Desk Lamp", "Sneakers", "Headphones", "Espresso"]
+          }
+        },
+        {
+          "user": "elbise",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["elbise bulamadım"],
+            "reply_not_contains": ["Desk Lamp", "Sneakers", "Headphones", "Espresso"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_14",
+      "name": "TR euro bütçe sonra mutfak — bütçe sızıntısı yok",
+      "description": "After a EUR budget search, kitchen topic must not inherit max_price.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "10 euro altında erkek tişörtü",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["€10", "bulamadım"],
+            "reply_not_contains": ["Gigabyte", "Men Check"]
+          }
+        },
+        {
+          "user": "mutfak eşyası öner",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Cleats", "Sneakers", "Loafers", "Men Check"],
+            "reply_contains": ["$"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_16",
+      "name": "TR kadın tişört → etek — konu değişimi",
+      "description": "After women's shirt search, skirt query must not inherit shirt context.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "kadın tişörtü sadece",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Backpack", "Bracelet", "Bag", "Desk Lamp"]
+          }
+        },
+        {
+          "user": "etek",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["etek bulamadım"],
+            "reply_not_contains": ["Desk Lamp", "Sneakers", "DANVOUY"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_17",
+      "name": "TR bedeni S kadın tişört — typo + beden",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "bedeni S olan kadın tişörleri",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_contains": ["DANVOUY", "$"],
+            "reply_not_contains": ["Backpack", "Desk Lamp", "bulamadım"]
+          }
+        },
+        {
+          "user": "stokta mı",
+          "expect": {
+            "intent": "product_followup",
+            "reply_contains": ["stokta"],
+            "grounding": {"stock_matches_db": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_18",
+      "name": "TR kitap/kamera — katalogda yok",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "kitap öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["kitap bulamadım"],
+            "reply_not_contains": ["Desk Lamp", "Sneakers"]
+          }
+        },
+        {
+          "user": "kamera öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["kamera bulamadım"],
+            "reply_not_contains": ["Desk Lamp", "Headphones"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_19",
+      "name": "TR ürün araması sırasında kargo sorusu",
+      "description": "Policy question during product context must not return product list.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "ayakkabı öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1
+          }
+        },
+        {
+          "user": "kargo ne kadar sürer",
+          "expect": {
+            "intent": "shipping",
+            "source": "rule_based",
+            "reply_contains": ["gün", "kargo"],
+            "reply_not_contains": ["Sneakers", "Sana uygun", "Desk Lamp"],
+            "grounding": {"policy_intent": "shipping"}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_20",
+      "name": "TR erkek tişört → daha ucuz",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "erkek tişörtü öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Women", "Womens"]
+          }
+        },
+        {
+          "user": "daha ucuz olanları göster",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Desk Lamp", "Espresso", "Women"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_21",
+      "name": "EN black dress under budget — no wrong fallback",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "show me black dresses under 50",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_not_contains": ["Desk Lamp", "Sneakers", "Here are some good options:\n- Desk"],
+            "reply_contains": ["couldn't find", "budget"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_22",
+      "name": "TR erkek spor ayakkabı → daha ucuz",
+      "description": "Men shoe search then cheaper refinement keeps footwear and men audience.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "erkek spor ayakkabı öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Women", "Womens", "Desk Lamp", "Wok"]
+          }
+        },
+        {
+          "user": "daha ucuz olanları göster",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Women", "Womens", "Desk Lamp", "Espresso", "tişört"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_23",
+      "name": "TR 50 euro altında ayakkabı — boş katalog eşiği",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "50 euro altında ayakkabı",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["bulamadım", "€50"],
+            "reply_not_contains": ["Desk Lamp", "Sneakers", "Here are some good options"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_24",
+      "name": "TR ayakkabı → 100 dolar altında sıkılaştırma",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "ayakkabı öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Wok", "Desk Lamp"]
+          }
+        },
+        {
+          "user": "100 dolar altında olanları göster",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Desk Lamp", "Espresso", "Wok"],
+            "grounding": {"prices_match_products": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_25",
+      "name": "EN sneakers under 120",
+      "lang": "en",
+      "turns": [
+        {
+          "user": "show sneakers under 120 dollars",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Desk Lamp", "Espresso", "Wok"],
+            "grounding": {"prices_match_products": true}
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_26",
+      "name": "TR nike ayakkabı → mutfak — konu değişimi",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "nike ayakkabı öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_contains": ["Nike"],
+            "reply_not_contains": ["Puma", "Desk Lamp"]
+          }
+        },
+        {
+          "user": "mutfak eşyası öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Nike", "Cleats", "Jordan", "Sneakers"],
+            "reply_contains": ["$"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_27",
+      "name": "TR bütçeli ayakkabı → erkek tişört — bütçe sızıntısı yok",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "30 dolar altında erkek ayakkabı",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 0,
+            "reply_contains": ["$30", "bulamadım"]
+          }
+        },
+        {
+          "user": "erkek tişörtü öner",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["$30", "bulamadım", "Desk Lamp"],
+            "reply_contains": ["$"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_28",
+      "name": "TR en ucuz ayakkabı — fiyat sıralaması",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "en ucuz ayakkabı hangisi",
+          "expect": {
+            "intent": "product_search",
+            "min_suggested_products": 1,
+            "reply_contains": ["79.99"],
+            "reply_not_contains": ["Desk Lamp", "Espresso", "Wok"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dlg_13",
+      "name": "TR ayakkabı sonra mutfak — yeni konu",
+      "description": "After shoe search, a new kitchen topic must not inherit shoe context.",
+      "lang": "tr",
+      "turns": [
+        {
+          "user": "ayakkabı öner",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 1,
+            "reply_not_contains": ["Wok", "Strainer", "Espresso Machine"]
+          }
+        },
+        {
+          "user": "mutfak eşyası öner",
+          "expect": {
+            "intent": "product_search",
+            "source": "product_search",
+            "min_suggested_products": 1,
+            "reply_contains": ["$"],
+            "reply_not_contains": ["Cleats", "Sneakers", "Trainers", "Jordan"]
+          }
+        }
+      ]
+    }
+  ]
+}

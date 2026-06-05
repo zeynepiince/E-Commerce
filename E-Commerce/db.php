@@ -84,3 +84,6 @@ try {
     // Tam connection string'i sızdırmamak için sadece kısa mesaj
     die("DB Connection failed: " . $e->getMessage());
 }
+
+require_once __DIR__ . '/database/SchemaService.php';
+ensure_application_schema($pdo);
