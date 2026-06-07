@@ -376,8 +376,6 @@ return [
     "profile.section.settings" => "Settings",
     "profile.email_notifications" => "Email notifications",
     "profile.email_notifications_desc" => "Receive order updates and promotions",
-    "profile.newsletter" => "Newsletter",
-    "profile.newsletter_desc" => "Weekly deals and new arrivals",
     "profile.save_preferences" => "Save preferences",
     "profile.msg.updated" => "Profile updated successfully.",
     "profile.msg.name_email_required" => "Name and email are required.",

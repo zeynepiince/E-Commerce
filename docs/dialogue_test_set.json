@@ -292,8 +292,8 @@
           "expect": {
             "intent": "product_search",
             "source": "product_search",
-            "min_suggested_products": 0,
-            "reply_contains": ["etek bulamadım"],
+            "min_suggested_products": 1,
+            "reply_contains": ["$", "Skirt"],
             "reply_not_contains": ["Desk Lamp", "Sneakers", "Headphones", "Espresso"]
           }
         },
@@ -302,8 +302,8 @@
           "expect": {
             "intent": "product_search",
             "source": "product_search",
-            "min_suggested_products": 0,
-            "reply_contains": ["elbise bulamadım"],
+            "min_suggested_products": 1,
+            "reply_contains": ["$"],
             "reply_not_contains": ["Desk Lamp", "Sneakers", "Headphones", "Espresso"]
           }
         }
@@ -355,8 +355,8 @@
           "user": "etek",
           "expect": {
             "intent": "product_search",
-            "min_suggested_products": 0,
-            "reply_contains": ["etek bulamadım"],
+            "min_suggested_products": 1,
+            "reply_contains": ["$", "Skirt"],
             "reply_not_contains": ["Desk Lamp", "Sneakers", "DANVOUY"]
           }
         }
@@ -372,7 +372,7 @@
           "expect": {
             "intent": "product_search",
             "min_suggested_products": 1,
-            "reply_contains": ["DANVOUY", "$"],
+            "reply_contains": ["Women", "$"],
             "reply_not_contains": ["Backpack", "Desk Lamp", "bulamadım"]
           }
         },

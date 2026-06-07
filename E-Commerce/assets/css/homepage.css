@@ -786,11 +786,30 @@
   color: #1f2937;
 }
 
+.newsletter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.newsletter-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
 .newsletter-form button {
   background: #FF6F00;
   padding: 12px 24px;
   font-weight: 600;
   border-radius: 12px;
+  border: none;
+  color: #fff;
+  cursor: pointer;
   transition: all 0.25s ease;
 }
 

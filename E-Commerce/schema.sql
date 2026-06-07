@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
   facebook_id VARCHAR(255) NULL DEFAULT NULL,
   phone VARCHAR(30) NULL DEFAULT NULL,
   address TEXT NULL,
-  newsletter_opt_in TINYINT(1) NOT NULL DEFAULT 0,
   email_notifications TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
@@ -212,23 +211,6 @@ CREATE TABLE IF NOT EXISTS chatbot_feedback (
   KEY idx_chatbot_feedback_created (created_at),
   KEY idx_chatbot_feedback_user (user_id),
   CONSTRAINT fk_chatbot_feedback_user
-    FOREIGN KEY (user_id) REFERENCES users (user_id)
-    ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- newsletter_subscribers
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS newsletter_subscribers (
-  subscriber_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  email VARCHAR(255) NOT NULL,
-  user_id INT NULL DEFAULT NULL,
-  source VARCHAR(50) NOT NULL DEFAULT 'homepage',
-  subscribed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (subscriber_id),
-  UNIQUE KEY uq_newsletter_email (email),
-  KEY idx_newsletter_user (user_id),
-  CONSTRAINT fk_newsletter_user
     FOREIGN KEY (user_id) REFERENCES users (user_id)
     ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

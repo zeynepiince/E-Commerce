@@ -95,7 +95,7 @@ chatbotv2/
     ├── admin_orders.php
     ├── admin_update_order.php
     ├── chatbot_feedback.php
-    ├── newsletter_api.php
+    ├── profile.php
     ├── recommended_api.php
     ├── logout.php
     ├── index.php             # Homepage (hero, categories, featured, recommendations)
@@ -365,13 +365,13 @@ mysql -u root -p -e "CREATE DATABASE chatbotv2_db CHARACTER SET utf8mb4 COLLATE 
 mysql -u root -p chatbotv2_db < E-Commerce/schema.sql
 ```
 
-`schema.sql` creates every table, seeds the six default categories, and includes columns from all incremental migrations (OAuth, newsletter, badges, sizes, fulfillment, chatbot feedback, etc.).
+`schema.sql` creates every table, seeds the six default categories, and includes columns from all incremental migrations (OAuth, notification prefs, badges, sizes, fulfillment, chatbot feedback, etc.).
 
 ### Core tables
 
 | Table | Purpose |
 |--------|---------|
-| `users` | Accounts + OAuth IDs + newsletter prefs |
+| `users` | Accounts + OAuth IDs + `email_notifications` preference |
 | `categories` | Top-level categories (seeded: Electronics, Fashion, Home, men's/women's clothing, jewelery) |
 | `products` | Catalog (`badges`, `sizes`, `sub_category`, `stock_quantity`, …) |
 | `orders` | Orders + payment/fulfillment fields (`tracking_number`, `shipped_at`, …) |
@@ -380,7 +380,6 @@ mysql -u root -p chatbotv2_db < E-Commerce/schema.sql
 | `password_resets` | Forgot-password tokens |
 | `support_interactions` | Logged-in chatbot message log |
 | `chatbot_feedback` | Thumbs up/down feedback |
-| `newsletter_subscribers` | Newsletter sign-ups |
 
 > **Wishlist:** Favorites are **not** stored in the database. They live in browser `localStorage` (`zera_favorites`; keys `zera_cart`, `zera_recent` for cart/recently viewed). The legacy `user_favorites` table was removed — see `migrations/drop_user_favorites.sql`.
 
@@ -398,7 +397,9 @@ Upgrade an **existing** database with the SQL files, or rely on runtime guards w
 | `add_order_fulfillment.sql` | `tracking_number`, `shipped_at`, … on `orders` | Yes | Yes (`OrderStatusService`) | Admin tracking columns missing |
 | `add_oauth_providers.sql` | `google_id`, `facebook_id` on `users` | Yes | Yes (`OAuthService`) | Social login IDs not stored |
 | `add_password_resets.sql` | `password_resets` table | Yes | Yes (`PasswordResetService`) | Forgot-password fails |
-| `add_newsletter_preferences.sql` | `newsletter_subscribers` + user prefs | Yes | Yes (`NewsletterService`) | Newsletter signup fails |
+| `add_newsletter_preferences.sql` | `users.email_notifications` column (legacy filename) | Yes | Yes | N/A |
+| `drop_newsletter_subscribers.sql` | Drop legacy newsletter list table | N/A | No | Stale table remains (harmless) |
+| `drop_newsletter_opt_in.sql` | Drop legacy `newsletter_opt_in` column | N/A | No | Unused column remains (harmless) |
 | `add_chatbot_feedback.sql` | `chatbot_feedback` table | Yes | Yes (`SchemaService`) | 👍👎 feedback save fails |
 | `fix_support_interactions_sender_check.sql` | Allow `sender='bot'` in chat log | Yes | Yes (`SchemaService`) | Bot chat messages not logged |
 | `drop_user_favorites.sql` | Drop legacy wishlist table | N/A | No | Stale table remains (harmless) |
@@ -490,7 +491,7 @@ Reproducible checks live under `tools/` — no PHPUnit required. JSON fixtures i
 | `eval_dialogue.php` | Multi-turn intent + reply assertions |
 | `eval_answer_quality.php` | DB grounding + AI guardrails |
 | `eval_tr_search.php` | Turkish entity extraction + SQL product search |
-| `eval_platform.php` | Auth, OAuth, newsletter, checkout, admin, CSRF |
+| `eval_platform.php` | Auth, OAuth, user prefs, checkout, admin, CSRF |
 | `eval_all.php` | Runs all of the above; exits non-zero if any suite fails |
 
 ```bash
@@ -625,7 +626,7 @@ php tools/eval_all.php --json       # `{ "passed": true, "suites": { ... } }`
 | `--failures` | Forwards to `eval_tr_search`, `eval_dialogue`, `eval_answer_quality`, `eval_platform` (shows failing cases) |
 | `--json` | Aggregated pass/fail per suite; individual suite `--save` flags are **not** forwarded — run evaluators directly to refresh `docs/eval_*_results.json` |
 
-### Platform evaluation (auth, OAuth, checkout, payments, admin, newsletter)
+### Platform evaluation (auth, OAuth, checkout, payments, admin, user prefs)
 
 CLI smoke tests for non-chatbot services. No PHPUnit required — same pattern as chatbot eval scripts.
 
@@ -640,7 +641,7 @@ php tools/eval_platform.php --no-db   # unit cases only (no MySQL)
 |-------|------------------|
 | **auth** | `auth_safe_return_url()`, sign-in/join validation (`AuthService.php`) |
 | **oauth** | Provider enable/disable, `oauth_start_url()` when credentials present/absent |
-| **newsletter** | Invalid email rejection, subscribe + duplicate handling (`NewsletterService.php`) |
+| **user_prefs** | Profile `email_notifications` flag on `users` (`UserPreferencesService.php`) |
 | **checkout** | `normalize_cart_lines()`, empty-cart guard, `create_awaiting_payment_order()` (rolled back) |
 | **payments** | `iyzico_is_configured()`, USD→TRY rate helper |
 | **admin** | `is_admin_user()` vs `ADMIN_EMAIL`; `update_order_status()` error paths |
@@ -725,7 +726,7 @@ csrf_require($asJson): void
 
 ### CSRF-protected POST endpoints (sample)
 
-`checkout.php`, `cancel_order.php`, `chatbot_api.php`, `chatbot_feedback.php`, `auth_api.php`, `newsletter_api.php`, `wishlist_prices.php`, `recommended_api.php`, `admin_update_order.php`, auth/profile forms.
+`checkout.php`, `cancel_order.php`, `chatbot_api.php`, `chatbot_feedback.php`, `auth_api.php`, `wishlist_prices.php`, `recommended_api.php`, `admin_update_order.php`, auth/profile forms.
 
 ### Protected resources
 
@@ -835,11 +836,10 @@ JSON POST endpoints expect `Content-Type: application/json` and a valid CSRF tok
 | `admin_update_order.php` | POST | Admin + CSRF | Update order status / tracking (`order_id`, `status`, …) |
 | `import_products.php` | GET | Admin + env | Import/backfill (`source`, `limit`, `women=1`, `backfill_subcat=1`, …) |
 
-### Newsletter & pages (HTML)
+### Storefront pages (HTML)
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `newsletter_api.php` | POST JSON | Optional | Homepage newsletter signup (`email`) |
 | `wishlist.php` | GET | Optional | Wishlist page (data from `localStorage`) |
 | `index.php`, `products.php`, … | GET | Optional | Standard storefront pages |
 
@@ -858,7 +858,7 @@ Suitable for demos and portfolios; harden further before production traffic.
 | **Admin** | Lightweight `admin_orders.php` only — no full catalog/user CMS |
 | **Wishlist** | Favorites are browser `localStorage` only (no cross-device sync) |
 | **Images** | Product images are external URLs only (no local CDN/upload pipeline) |
-| **Tests** | No PHPUnit/CI pipeline — `tools/eval_*.php` + `docs/*_test_set.json`: chatbot (intents, dialogue, answer quality, TR search) and platform (auth, OAuth, newsletter, checkout, payments, admin) via `eval_platform.php` / `eval_all.php` |
+| **Tests** | No PHPUnit/CI pipeline — `tools/eval_*.php` + `docs/*_test_set.json`: chatbot (intents, dialogue, answer quality, TR search) and platform (auth, OAuth, user prefs, checkout, payments, admin) via `eval_platform.php` / `eval_all.php` |
 | **Import script** | Disabled by default (`IMPORT_PRODUCTS_ENABLED`); must stay off in production |
 
 ---

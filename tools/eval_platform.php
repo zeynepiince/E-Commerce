@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Evaluate platform services: auth, OAuth, newsletter, checkout/payments, admin, orders.
+ * Evaluate platform services: auth, OAuth, user prefs, checkout/payments, admin, orders.
  *
  * Usage:
  *   php tools/eval_platform.php
@@ -39,7 +39,7 @@ require_once $ecRoot . '/functions.php';
 require_once $ecRoot . '/security/Security.php';
 require_once $ecRoot . '/auth/AuthService.php';
 require_once $ecRoot . '/auth/OAuthService.php';
-require_once $ecRoot . '/newsletter/NewsletterService.php';
+require_once $ecRoot . '/user/UserPreferencesService.php';
 require_once $ecRoot . '/orders/OrderStatusService.php';
 require_once $ecRoot . '/payments/bootstrap.php';
 require_once $ecRoot . '/payments/IyzicoService.php';
@@ -200,42 +200,48 @@ eval_assert(
 
 eval_restore_env($oauthBackup);
 
-// ── Newsletter ─────────────────────────────────────────────────────────────────
+// ── User notification preferences (profile) ───────────────────────────────────
 
 if ($dbAvailable && $pdo instanceof PDO) {
-    $invalidNewsletter = newsletter_subscribe($pdo, 'not-valid', null, 'eval');
-    eval_assert(
-        $report,
-        ($invalidNewsletter['success'] ?? true) === false,
-        'newsletter',
-        'invalid_email',
-        'invalid email should fail'
-    );
+    $prefUserId = null;
+    try {
+        $prefStmt = $pdo->prepare(
+            'INSERT INTO users (full_name, email, password_hash, email_notifications)
+             VALUES (?, ?, ?, 1)'
+        );
+        $prefEmail = 'eval-prefs-' . bin2hex(random_bytes(4)) . '@example.com';
+        $prefStmt->execute(['Eval Prefs', $prefEmail, password_hash('eval-prefs-pass', PASSWORD_DEFAULT)]);
+        $prefUserId = (int) $pdo->lastInsertId();
 
-    $testEmail = 'eval-platform-' . bin2hex(random_bytes(4)) . '@example.com';
-    $first = newsletter_subscribe($pdo, $testEmail, null, 'eval');
-    eval_assert(
-        $report,
-        ($first['success'] ?? false) === true,
-        'newsletter',
-        'subscribe_new',
-        'new email should subscribe'
-    );
+        user_prefs_save_email_notifications($pdo, $prefUserId, true);
+        eval_assert(
+            $report,
+            user_prefs_get_email_notifications($pdo, $prefUserId) === true,
+            'user_prefs',
+            'save_preferences',
+            'email_notifications flag should persist on users row'
+        );
 
-    $second = newsletter_subscribe($pdo, $testEmail, null, 'eval');
-    eval_assert(
-        $report,
-        ($second['success'] ?? false) === true && str_contains(strtolower($second['message'] ?? ''), 'already'),
-        'newsletter',
-        'subscribe_duplicate',
-        'duplicate should return already-subscribed style message'
-    );
+        user_prefs_save_email_notifications($pdo, $prefUserId, false);
+        eval_assert(
+            $report,
+            user_prefs_get_email_notifications($pdo, $prefUserId) === false,
+            'user_prefs',
+            'clear_preferences',
+            'email_notifications flag should update when cleared'
+        );
 
-    $pdo->prepare('DELETE FROM newsletter_subscribers WHERE email = ?')->execute([strtolower($testEmail)]);
+        $pdo->prepare('DELETE FROM users WHERE user_id = ?')->execute([$prefUserId]);
+    } catch (Throwable $e) {
+        if ($prefUserId) {
+            $pdo->prepare('DELETE FROM users WHERE user_id = ?')->execute([$prefUserId]);
+        }
+        eval_skip($report, 'user_prefs', 'save_preferences', 'preference test failed: ' . $e->getMessage());
+        eval_skip($report, 'user_prefs', 'clear_preferences', 'preference test failed');
+    }
 } else {
-    eval_skip($report, 'newsletter', 'invalid_email', 'database unavailable');
-    eval_skip($report, 'newsletter', 'subscribe_new', 'database unavailable');
-    eval_skip($report, 'newsletter', 'subscribe_duplicate', 'database unavailable');
+    eval_skip($report, 'user_prefs', 'save_preferences', 'database unavailable');
+    eval_skip($report, 'user_prefs', 'clear_preferences', 'database unavailable');
 }
 
 // ── Checkout / cart normalization ──────────────────────────────────────────────

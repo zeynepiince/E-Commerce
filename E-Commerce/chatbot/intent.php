@@ -193,7 +193,7 @@ function extract_entities(string $rawMessage): array
     if (preg_match('/\b(?:size|numara)\s*(\d{1,2}(?:\.\d+)?)\b/i', $rawMessage, $m)) {
         $out["size"] = $m[1];
     }
-    if (preg_match('/\b(?:size|beden|numara)\s*[:\-]?\s*(xxs|xs|s|m|l|xl|xxl|2xl|3xl)\b/ui', $rawMessage, $m)) {
+    if (preg_match('/\b(?:size|beden|numara)\s+(?!(?:are|is|available|var|mevcut)\b)(xxs|xs|s|m|l|xl|xxl|2xl|3xl)\b/ui', $rawMessage, $m)) {
         $out["size"] = strtoupper($m[1]);
     }
     if (preg_match('/\bbeden(?:i)?\s+(xxs|xs|s|m|l|xl|xxl|2xl|3xl)\s+olan\b/ui', $rawMessage, $m)) {

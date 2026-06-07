@@ -1,10 +1,10 @@
 <?php
 require_once 'functions.php';
-require_once __DIR__ . '/newsletter/NewsletterService.php';
+require_once __DIR__ . '/user/UserPreferencesService.php';
 
 $userId = require_login();
-newsletter_ensure_schema($pdo);
-$stmt = $pdo->prepare("SELECT user_id, full_name, email, password_hash, created_at, newsletter_opt_in, email_notifications FROM users WHERE user_id = ?");
+user_prefs_ensure_schema($pdo);
+$stmt = $pdo->prepare("SELECT user_id, full_name, email, password_hash, created_at, email_notifications FROM users WHERE user_id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
@@ -115,16 +115,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'settings') {
         $emailNotifications = !empty($_POST['email_notifications']);
-        $newsletterOptIn = !empty($_POST['newsletter']);
-        newsletter_save_user_preferences($pdo, $userId, $emailNotifications, $newsletterOptIn);
+        user_prefs_save_email_notifications($pdo, $userId, $emailNotifications);
         $user['email_notifications'] = $emailNotifications ? 1 : 0;
-        $user['newsletter_opt_in'] = $newsletterOptIn ? 1 : 0;
         $settingsMessage = t('profile.msg.preferences_saved', 'Preferences saved.');
     }
 }
 
 $emailNotificationsOn = (bool) ((int) ($user['email_notifications'] ?? 1));
-$newsletterOn = (bool) ((int) ($user['newsletter_opt_in'] ?? 0));
 $membershipDate = isset($user['created_at']) ? date('F j, Y', strtotime($user['created_at'])) : t('profile.member', 'Member');
 
 $page_title = t("meta.profile_title", "ZERA - Profile");
@@ -283,16 +280,6 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
             </div>
             <label class="profile-toggle">
               <input type="checkbox" name="email_notifications" value="1" <?= $emailNotificationsOn ? 'checked' : '' ?>>
-              <span class="profile-toggle-slider"></span>
-            </label>
-          </div>
-          <div class="profile-setting-row">
-            <div>
-              <label class="profile-setting-label"><?= htmlspecialchars(t('profile.newsletter', 'Newsletter'), ENT_QUOTES, 'UTF-8') ?></label>
-              <p class="profile-setting-desc"><?= htmlspecialchars(t('profile.newsletter_desc', 'Weekly deals and new arrivals'), ENT_QUOTES, 'UTF-8') ?></p>
-            </div>
-            <label class="profile-toggle">
-              <input type="checkbox" name="newsletter" value="1" <?= $newsletterOn ? 'checked' : '' ?>>
               <span class="profile-toggle-slider"></span>
             </label>
           </div>

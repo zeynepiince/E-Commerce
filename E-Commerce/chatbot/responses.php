@@ -47,9 +47,7 @@ function format_budget_limit_label(array $entities, string $lang): string
         ? number_format($amount, 0)
         : number_format($amount, 2);
     if ($currency === 'EUR') {
-        return $lang === 'tr'
-            ? $formatted . ' euro'
-            : '€' . $formatted;
+        return '€' . $formatted;
     }
     if ($currency === 'TRY') {
         return $formatted . ($lang === 'tr' ? ' TL' : ' TRY');
@@ -93,6 +91,25 @@ function build_product_reply_intro(array $entities, string $lang = "en"): string
     return $lang === "tr"
         ? "Sana uygun olabilecek seçenekler:"
         : "Here are some good options for you:";
+}
+
+/** @param array<int, array<string, mixed>> $products */
+function format_product_lines_for_reply(array $products, int $limit = 4): string
+{
+    $lines = [];
+    foreach (array_slice($products, 0, $limit) as $product) {
+        if (!is_array($product)) {
+            continue;
+        }
+        $name = trim((string) ($product['name'] ?? 'Product'));
+        if ($name === '') {
+            $name = 'Product';
+        }
+        $price = number_format((float) ($product['price'] ?? 0), 2);
+        $lines[] = "- {$name} (\${$price})";
+    }
+
+    return $lines === [] ? '' : "\n" . implode("\n", $lines);
 }
 
 function build_product_reply(array $products, array $entities, string $lang = "en"): string
@@ -171,8 +188,7 @@ function build_product_reply(array $products, array $entities, string $lang = "e
             : "I couldn't find suitable in-stock products right now. Try another category or budget.";
     }
 
-    // Product cards are rendered separately in the chat UI.
-    return build_product_reply_intro($entities, $lang);
+    return build_product_reply_intro($entities, $lang) . format_product_lines_for_reply($products);
 }
 
 function build_shipping_reply(string $rawMessage, array $knowledge, string $lang): string

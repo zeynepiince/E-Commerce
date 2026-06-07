@@ -50,10 +50,14 @@ function product_violates_entity_constraints(array $product, array $entities): ?
         }
     }
 
-    if (in_array($type, ['dress', 'skirts'], true)) {
-        $match = preg_match('/\b(dress|dresses|skirt|skirts|gown|maxi|midi)\b/u', $name . ' ' . $sub . ' ' . $cat);
-        if (!$match) {
-            return 'not dress/skirt';
+    if ($type === 'skirts') {
+        if (!preg_match('/\b(skirt|skirts|etek)\b/u', $name . ' ' . $sub . ' ' . $cat)) {
+            return 'not a skirt';
+        }
+    }
+    if ($type === 'dress') {
+        if (!preg_match('/\b(dress|dresses|gown|maxi|midi|elbise|frock)\b/u', $name . ' ' . $sub . ' ' . $cat)) {
+            return 'not a dress';
         }
     }
 

@@ -492,11 +492,25 @@ $selectedCategory = $_GET['category'] ?? '';
       </ul>
     </div>
 
-    <div class="info-col">
+    <div class="info-col home-newsletter">
       <h4><?= htmlspecialchars(t("home.newsletter_title", "Stay in the loop"), ENT_QUOTES, 'UTF-8') ?></h4>
       <p style="font-size:13px;color:#6b7280;"><?= htmlspecialchars(t("home.newsletter_sub", "Be the first to know about new drops and limited deals."), ENT_QUOTES, 'UTF-8') ?></p>
-      <form id="homeNewsletterForm" class="newsletter-form" novalidate>
-        <input type="email" id="homeNewsletterEmail" name="email" placeholder="<?= htmlspecialchars(t("home.newsletter_placeholder", "Enter your email"), ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email" />
+      <form
+        id="homeNewsletterForm"
+        class="newsletter-form"
+        novalidate
+        data-msg-success="<?= htmlspecialchars(t('newsletter.subscribed', 'Thanks! You have been added to our newsletter.'), ENT_QUOTES, 'UTF-8') ?>"
+        data-msg-invalid="<?= htmlspecialchars(t('newsletter.error_invalid_email', 'Please enter a valid email address.'), ENT_QUOTES, 'UTF-8') ?>"
+        data-msg-already="<?= htmlspecialchars(t('newsletter.already_subscribed', 'You are already on our newsletter list.'), ENT_QUOTES, 'UTF-8') ?>"
+      >
+        <input
+          type="email"
+          id="homeNewsletterEmail"
+          name="email"
+          placeholder="<?= htmlspecialchars(t("home.newsletter_placeholder", "Enter your email"), ENT_QUOTES, 'UTF-8') ?>"
+          required
+          autocomplete="email"
+        />
         <button type="submit" id="homeNewsletterBtn"><?= htmlspecialchars(t("home.newsletter_cta", "Join newsletter"), ENT_QUOTES, 'UTF-8') ?></button>
       </form>
       <p id="homeNewsletterMessage" class="newsletter-message" role="alert" hidden></p>

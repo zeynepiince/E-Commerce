@@ -376,8 +376,6 @@ return [
     "profile.section.settings" => "Ayarlar",
     "profile.email_notifications" => "E-posta bildirimleri",
     "profile.email_notifications_desc" => "Sipariş güncellemeleri ve kampanyaları al",
-    "profile.newsletter" => "Bülten",
-    "profile.newsletter_desc" => "Haftalık fırsatlar ve yeni ürünler",
     "profile.save_preferences" => "Tercihleri Kaydet",
     "profile.msg.updated" => "Profil başarıyla güncellendi.",
     "profile.msg.name_email_required" => "Ad ve e-posta zorunludur.",

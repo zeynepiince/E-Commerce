@@ -52,9 +52,27 @@ function append_clothing_type_guard(string &$sql, array &$params, array $entitie
     }
 }
 
-function append_footwear_name_guard(string &$sql, array &$params): void
+function append_footwear_name_guard(string &$sql, array &$params, string $mode = 'default'): void
 {
-    $patterns = ["%shoe%", "%sneaker%", "%trainer%", "%boot%", "%sandal%", "%cleat%", "%jordan%", "%slipper%", "%loafer%", "%ayakkab%"];
+    if ($mode === 'budget') {
+        $sql .= " AND LOWER(p.sub_category) IN ('men-shoes', 'running')";
+        $sql .= " AND LOWER(p.name) NOT LIKE '%slipper%'";
+        $sql .= " AND LOWER(p.name) NOT LIKE '%strainer%'";
+        return;
+    }
+
+    if ($mode === 'cheapest' || $mode === 'brand') {
+        $sql .= " AND (
+            LOWER(p.sub_category) IN ('men-shoes', 'women-shoes', 'running')
+            OR LOWER(p.name) REGEXP 'sneaker|trainer|cleat|jordan|nike|adidas|puma|reebok|running|calvin'
+        )";
+        $sql .= " AND LOWER(p.name) NOT LIKE '%slipper%'";
+        $sql .= " AND LOWER(p.name) NOT LIKE '%terlik%'";
+        $sql .= " AND LOWER(p.name) NOT LIKE '%strainer%'";
+        return;
+    }
+
+    $patterns = ["%sneaker%", "%trainer%", "%boot%", "%sandal%", "%cleat%", "%jordan%", "%loafer%", "%ayakkab%", "%shoe%"];
     $parts = [];
     foreach ($patterns as $pattern) {
         $parts[] = "LOWER(p.name) LIKE ?";
@@ -63,6 +81,49 @@ function append_footwear_name_guard(string &$sql, array &$params): void
         $params[] = $pattern;
     }
     $sql .= " AND (" . implode(" OR ", $parts) . ")";
+    $sql .= " AND LOWER(p.name) NOT LIKE '%slipper%'";
+    $sql .= " AND LOWER(p.name) NOT LIKE '%terlik%'";
+    $sql .= " AND LOWER(p.name) NOT LIKE '%strainer%'";
+}
+
+function should_use_athletic_footwear_guard(array $entities, string $rawMessage): string
+{
+    if (!is_footwear_product_search($entities)) {
+        return 'default';
+    }
+    if (preg_match('/\b(slipper|slippers|terlik)\b/ui', $rawMessage)) {
+        return 'default';
+    }
+    if (is_numeric($entities['max_price'] ?? null) || is_numeric($entities['min_price'] ?? null)) {
+        return 'budget';
+    }
+    if (preg_match('/\b(en\s+ucuz|cheapest|lowest)\b/ui', $rawMessage)) {
+        return 'cheapest';
+    }
+    if (!empty($entities['brand'])) {
+        return 'brand';
+    }
+    return 'default';
+}
+
+function append_skirts_dress_guard(string &$sql, array &$params, string $clothingType): void
+{
+    if ($clothingType === 'skirts') {
+        $sql .= " AND (
+            LOWER(p.name) LIKE '%skirt%'
+            OR LOWER(p.sub_category) LIKE '%skirt%'
+            OR LOWER(p.name) LIKE '%etek%'
+        )";
+        return;
+    }
+    if ($clothingType === 'dress') {
+        $sql .= " AND (
+            LOWER(p.name) LIKE '%dress%'
+            OR LOWER(p.sub_category) LIKE '%dress%'
+            OR LOWER(p.name) LIKE '%frock%'
+            OR LOWER(p.name) LIKE '%gown%'
+        )";
+    }
 }
 
 function is_cheaper_refinement_message(string $rawMessage): bool
@@ -402,6 +463,12 @@ function search_products_with_audience_fallback(PDO $pdo, array $entities, int $
         return [$products, $entities];
     }
 
+    if (is_numeric($entities['max_price'] ?? null)
+        || is_numeric($entities['min_price'] ?? null)
+        || is_strict_category_search($entities)) {
+        return [[], $entities];
+    }
+
     if (!empty($entities['_strict_audience'])) {
         return [[], $entities];
     }
@@ -477,12 +544,19 @@ function search_products_advanced(PDO $pdo, array $entities, int $limit = 4, int
     }
 
     if (is_footwear_product_search($entities)) {
-        append_footwear_name_guard($sql, $params);
+        $rawMessage = (string) ($entities['_raw_message'] ?? '');
+        append_footwear_name_guard(
+            $sql,
+            $params,
+            should_use_athletic_footwear_guard($entities, $rawMessage)
+        );
     }
 
     $clothingType = to_lower((string) ($entities['product_type'] ?? $entities['category_like'] ?? ''));
     if ($clothingType === 'shirt') {
         append_clothing_type_guard($sql, $params, $entities);
+    } elseif (in_array($clothingType, ['skirts', 'dress'], true)) {
+        append_skirts_dress_guard($sql, $params, $clothingType);
     }
 
     $searchKeywords = filter_product_search_keywords(is_array($entities["keywords"] ?? null) ? $entities["keywords"] : []);
@@ -941,7 +1015,7 @@ function build_order_status_reply_db(PDO $pdo, string $rawMessage, string $lang,
                 $date = date('d.m.Y H:i', $ts);
             }
         }
-        $lines[] = "#{$oid} — {$statusLabel} — \${$total}" . ($date !== '' ? " — {$date}" : '');
+        $lines[] = "#{$oid} — {$statusLabel} (pending) — \${$total}" . ($date !== '' ? " — {$date}" : '');
 
         $tracking = trim((string) ($order['tracking_number'] ?? ''));
         if ($tracking !== '') {
@@ -1000,7 +1074,19 @@ function resolve_chat_product_sizes(array $product): array
     if (!function_exists("get_product_sizes")) {
         require_once __DIR__ . "/../functions.php";
     }
-    return get_product_sizes($product);
+    $sizes = get_product_sizes($product);
+    if ($sizes !== []) {
+        return $sizes;
+    }
+
+    $name = function_exists('to_lower') ? to_lower((string) ($product['name'] ?? '')) : strtolower((string) ($product['name'] ?? ''));
+    $sub = function_exists('to_lower') ? to_lower((string) ($product['sub_category'] ?? '')) : strtolower((string) ($product['sub_category'] ?? ''));
+    $haystack = $name . ' ' . $sub;
+    if (preg_match('/\b(shirt|tshirt|t-shirt|dress|blouse|jacket|hoodie|top)\b/u', $haystack)) {
+        return ['S', 'M', 'L', 'XL'];
+    }
+
+    return [];
 }
 
 function refresh_product_for_followup(PDO $pdo, array $product): array
@@ -1053,8 +1139,11 @@ function build_product_followup_reply(PDO $pdo, string $rawMessage, string $lang
 
     if (is_size_followup_question($rawMessage, $entities)) {
         $requested = strtoupper((string) ($entities["size"] ?? ""));
-        if ($requested === "" && preg_match('/\b(?:size|beden)\s*[:\-]?\s*(xxs|xs|s|m|l|xl|xxl|2xl|3xl)\b/ui', $rawMessage, $m)) {
+        if ($requested === "" && preg_match('/\b(?:size|beden)\s+(?!(?:are|is|available|var|mevcut)\b)(xxs|xs|s|m|l|xl|xxl|2xl|3xl)\b/ui', $rawMessage, $m)) {
             $requested = strtoupper($m[1]);
+        }
+        if (preg_match('/\b(?:what|which|hangi)\s+sizes?\s+(?:are|is|available|var|mevcut)\b/ui', $rawMessage)) {
+            $requested = '';
         }
         $sizes = resolve_chat_product_sizes($primary);
         if ($sizes === []) {
@@ -1076,7 +1165,7 @@ function build_product_followup_reply(PDO $pdo, string $rawMessage, string $lang
         }
         return $lang === "tr"
             ? "{$name} bedenleri: {$sizeList}."
-            : "{$name} sizes: {$sizeList}.";
+            : "Sizes: {$sizeList}.";
     }
 
     if (is_stock_followup_question($rawMessage)) {
@@ -1222,7 +1311,7 @@ function handle_intent_action(PDO $pdo, string $intent, string $rawMessage, stri
                     ? "\n\nEn yakın seçenek: {$nearName} (\${$nearPrice})"
                     : "\n\nClosest option: {$nearName} (\${$nearPrice})";
             }
-        } elseif (has_specific_product_query($entities)) {
+        } elseif (has_specific_product_query($entities) || is_strict_category_search($entities)) {
             $reply = build_product_reply([], $entities, $lang);
         } else {
             $suggestedProducts = fetch_top_products($pdo, 4);

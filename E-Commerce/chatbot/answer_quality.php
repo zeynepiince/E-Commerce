@@ -106,7 +106,12 @@ function verify_size_reply_matches_product(string $reply, array $product, ?strin
         require_once __DIR__ . '/../functions.php';
     }
 
-    $expected = array_map(static fn($s) => strtoupper((string) $s), get_product_sizes($product));
+    $expected = array_map(
+        static fn($s) => strtoupper((string) $s),
+        function_exists('resolve_chat_product_sizes')
+            ? resolve_chat_product_sizes($product)
+            : get_product_sizes($product)
+    );
     $errors = [];
 
     if ($requestedSize !== null && $requestedSize !== '') {

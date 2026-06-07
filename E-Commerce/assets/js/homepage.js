@@ -73,23 +73,25 @@
       const inView = rect.top < window.innerHeight && rect.bottom > 0;
       if (inView) {
         section.classList.add('home-visible');
-      } else {
-        if (section.classList.contains('home-section')) {
-          section.classList.add('home-section--animate');
-        } else if (section.classList.contains('home-newsletter')) {
-          section.classList.add('home-newsletter--animate');
-        }
+      } else if (section.classList.contains('home-section')) {
+        section.classList.add('home-section--animate');
+        observer.observe(section);
+      } else if (section.classList.contains('home-newsletter')) {
+        section.classList.add('home-newsletter--animate');
         observer.observe(section);
       }
     });
   }
 
+  /** UI-only newsletter signup (localStorage; no server / DB). */
   function initNewsletterForm() {
     const form = document.getElementById('homeNewsletterForm');
     const emailInput = document.getElementById('homeNewsletterEmail');
     const messageEl = document.getElementById('homeNewsletterMessage');
     const submitBtn = document.getElementById('homeNewsletterBtn');
     if (!form || !emailInput || !messageEl) return;
+
+    const storageKey = 'zera_newsletter_email';
 
     function showMessage(text, type) {
       const message = String(text || '').trim();
@@ -104,46 +106,39 @@
       messageEl.className = `newsletter-message newsletter-message--${type === 'success' ? 'success' : 'error'}`;
     }
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       const email = String(emailInput.value || '').trim();
       if (!email) return;
 
-      if (submitBtn) submitBtn.disabled = true;
-      showMessage('', '');
-
-      try {
-        const url = new URL('newsletter_api.php', window.location.href);
-        const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG : '';
-        if (lang) url.searchParams.set('lang', lang);
-
-        const res = await fetch(url.toString(), {
-          method: 'POST',
-          headers: (typeof window.csrfHeaders === 'function'
-            ? window.csrfHeaders({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              })
-            : {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              }),
-          credentials: 'same-origin',
-          body: JSON.stringify({ email }),
-        });
-        const data = await res.json().catch(() => ({}));
-
-        if (data.success) {
-          showMessage(data.message || '', 'success');
-          form.reset();
-        } else {
-          showMessage(data.message || 'Something went wrong.', 'error');
-        }
-      } catch (err) {
-        showMessage('Something went wrong.', 'error');
-      } finally {
-        if (submitBtn) submitBtn.disabled = false;
+      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!valid) {
+        showMessage(form.dataset.msgInvalid || 'Please enter a valid email address.', 'error');
+        return;
       }
+
+      const normalized = email.toLowerCase();
+      let stored = '';
+      try {
+        stored = String(localStorage.getItem(storageKey) || '').toLowerCase();
+      } catch (err) {
+        stored = '';
+      }
+
+      if (stored === normalized) {
+        showMessage(form.dataset.msgAlready || 'You are already on our newsletter list.', 'success');
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        localStorage.setItem(storageKey, normalized);
+      } catch (err) {
+        /* ignore quota errors — still show success for demo UI */
+      }
+      showMessage(form.dataset.msgSuccess || 'Thanks! You have been added to our newsletter.', 'success');
+      form.reset();
+      if (submitBtn) submitBtn.disabled = false;
     });
   }
 
