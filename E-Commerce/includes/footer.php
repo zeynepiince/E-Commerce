@@ -2,10 +2,15 @@
 if (!function_exists("t")) {
   require_once __DIR__ . "/../functions.php";
 }
-require_once __DIR__ . "/../auth/OAuthService.php";
 $appLang = get_current_lang();
 $auth_modal_return = (string) ($_SERVER['REQUEST_URI'] ?? 'index.php');
-$auth_modal_oauth_links = oauth_login_links($auth_modal_return);
+$auth_modal_oauth_links = ['google' => null, 'facebook' => null];
+try {
+  require_once __DIR__ . "/../auth/OAuthService.php";
+  $auth_modal_oauth_links = oauth_login_links($auth_modal_return);
+} catch (Throwable $e) {
+  // OAuth yapılandırması eksikse footer/chat/cart yine de çalışsın
+}
 $auth_modal_logged_in = !empty($_SESSION['user_id']);
 ?>
 <footer class="site-footer">
@@ -102,7 +107,11 @@ function toggleFooterInfo(e, id) {
 
 
 
-<button class="chat-toggle" onclick="toggleChat()">💬</button>
+<button type="button" class="chat-toggle" data-action="toggle-chat" aria-label="<?= htmlspecialchars(t("chat.title", "Customer Support"), ENT_QUOTES, 'UTF-8') ?>"><span aria-hidden="true">💬</span></button>
+<style>
+.chat-toggle{position:fixed;bottom:28px;right:28px;width:64px;height:64px;border-radius:50%;background:#ff6f00;color:#fff;font-size:26px;border:none;cursor:pointer;z-index:2147483646;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(255,111,0,.45)}
+@media(max-width:768px){.chat-toggle{bottom:88px}}
+</style>
 
 <div class="chatbot" id="chatbot">
   <div class="chat-header"><?= htmlspecialchars(t("chat.title", "Customer Support"), ENT_QUOTES, 'UTF-8') ?></div>
@@ -116,7 +125,7 @@ function toggleFooterInfo(e, id) {
   </div>
 </div>
 
-<div class="cart-backdrop" id="cartBackdrop" onclick="toggleCart()"></div>
+<div class="cart-backdrop" id="cartBackdrop" data-action="toggle-cart"></div>
 
 <!-- Auth Modal -->
 <?php if (!$auth_modal_logged_in): ?>
@@ -238,6 +247,16 @@ function toggleFooterInfo(e, id) {
 </div>
 
 <script>
+window.APP_BASE_PATH = <?= json_encode(site_base_path()) ?>;
+window.ZERA_SITE_BASE = <?= json_encode(site_base_href()) ?>;
+window.ZERA_API = <?= json_encode([
+    'chatbot' => api_url('recommended_api.php'),
+    'auth' => api_url('auth_api.php'),
+    'feedback' => api_url('recommended_api.php'),
+    'recommended' => api_url('recommended_api.php'),
+    'wishlist_prices' => api_url('wishlist_prices.php'),
+    'checkout' => api_url('checkout.php'),
+], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
 window.APP_LANG = <?= json_encode($appLang) ?>;
 window.CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;
 window.csrfHeaders = function (extra) {
@@ -290,9 +309,9 @@ window.MAIN_I18N = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
-<script src="assets/js/main.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/main.js')) ?>"></script>
+<script src="<?= htmlspecialchars(asset_full_url('assets/js/main.js'), ENT_QUOTES, 'UTF-8') ?>?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/main.js')) ?>"></script>
 <?php if (isset($is_homepage) && $is_homepage): ?>
-<script src="assets/js/homepage.js?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/homepage.js')) ?>"></script>
+<script src="<?= htmlspecialchars(asset_full_url('assets/js/homepage.js'), ENT_QUOTES, 'UTF-8') ?>?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/js/homepage.js')) ?>"></script>
 <?php endif; ?>
 <?php if (!empty($page_footer_scripts)) { echo $page_footer_scripts; } ?>
 </body>

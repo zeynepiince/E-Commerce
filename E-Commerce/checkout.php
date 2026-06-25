@@ -1,132 +1,164 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once 'functions.php';
-require_once __DIR__ . '/payments/IyzicoService.php';
 
-// JSON API — iyzico ödeme başlatma
-if (
-    $_SERVER['REQUEST_METHOD'] === 'POST'
-    && isset($_SERVER['CONTENT_TYPE'])
-    && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false
-) {
-    header('Content-Type: application/json; charset=utf-8');
-    csrf_require(true);
+// JSON API — ödeme başlatma (iyzico veya demo mod)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $payload = zera_read_post_payload();
+    $acceptsJson = isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+    $isCheckoutApi = isset($payload['cart'])
+        || isset($_GET['checkout_api'])
+        || $acceptsJson;
 
-    $data = json_decode(file_get_contents('php://input'), true);
-    if (!is_array($data) || empty($data['cart']) || !is_array($data['cart'])) {
-        echo json_encode(['success' => false, 'error' => 'Empty cart']);
-        exit;
-    }
+    if ($isCheckoutApi) {
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        ini_set('display_errors', '0');
+        require_once __DIR__ . '/payments/IyzicoService.php';
+        header('Content-Type: application/json; charset=utf-8');
+        csrf_require(true);
 
-    $shipping = is_array($data['shipping'] ?? null) ? $data['shipping'] : [];
-    $requiredShipping = ['full_name', 'email', 'address', 'city', 'zip'];
-    foreach ($requiredShipping as $field) {
-        if (trim((string) ($shipping[$field] ?? '')) === '') {
+        $cart = is_array($payload['cart'] ?? null) ? $payload['cart'] : [];
+        if ($cart === []) {
             echo json_encode([
                 'success' => false,
-                'error' => 'Missing shipping field: ' . $field,
+                'error' => 'Empty cart or request body not received. Refresh the page and try again.',
+                'code' => 'empty_cart',
             ]);
             exit;
         }
-    }
 
-    $phoneCountry = trim((string) ($shipping['phone_country'] ?? 'TR'));
-    $phoneNumber = preg_replace('/\D+/', '', (string) ($shipping['phone_number'] ?? ''));
-    $dial = '+90';
-    if ($phoneCountry === 'US') {
-        $dial = '+1';
-    } elseif ($phoneCountry === 'GB') {
-        $dial = '+44';
-    }
-    $shipping['phone'] = $phoneNumber !== '' ? $dial . $phoneNumber : '';
-    unset($shipping['phone_number']);
+        $shipping = is_array($payload['shipping'] ?? null) ? $payload['shipping'] : [];
+        $requiredShipping = ['full_name', 'email', 'address', 'city', 'zip'];
+        foreach ($requiredShipping as $field) {
+            if (trim((string) ($shipping[$field] ?? '')) === '') {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Missing shipping field: ' . $field,
+                ]);
+                exit;
+            }
+        }
 
-    $user_id = require_login();
+        $phoneCountry = trim((string) ($shipping['phone_country'] ?? 'TR'));
+        $phoneNumber = preg_replace('/\D+/', '', (string) ($shipping['phone_number'] ?? ''));
+        $dial = '+90';
+        if ($phoneCountry === 'US') {
+            $dial = '+1';
+        } elseif ($phoneCountry === 'GB') {
+            $dial = '+44';
+        }
+        $shipping['phone'] = $phoneNumber !== '' ? $dial . $phoneNumber : '';
+        unset($shipping['phone_number']);
 
-    if (!iyzico_is_configured()) {
-        echo json_encode([
-            'success' => false,
-            'error' => 'iyzico is not configured. Set IYZICO_API_KEY and IYZICO_SECRET_KEY in .env',
-            'code' => 'iyzico_not_configured',
-        ]);
+        $user_id = require_login();
+
+        if (!checkout_can_process()) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'iyzico is not configured. Set IYZICO_API_KEY and IYZICO_SECRET_KEY in .env, or enable CHECKOUT_DEMO_MODE=true',
+                'code' => 'iyzico_not_configured',
+            ]);
+            exit;
+        }
+
+        try {
+            if (checkout_demo_mode_enabled() && !iyzico_checkout_ready()) {
+                $created = complete_demo_checkout($pdo, $user_id, $cart, $shipping);
+                echo json_encode([
+                    'success' => true,
+                    'order_id' => $created['order_id'],
+                    'payment_provider' => 'demo',
+                    'demo' => true,
+                ]);
+                exit;
+            }
+
+            $userStmt = $pdo->prepare('SELECT user_id, full_name, email FROM users WHERE user_id = ? LIMIT 1');
+            $userStmt->execute([$user_id]);
+            $userRow = $userStmt->fetch(PDO::FETCH_ASSOC) ?: [
+                'user_id' => $user_id,
+                'full_name' => (string) ($shipping['full_name'] ?? 'Customer'),
+                'email' => (string) ($shipping['email'] ?? ''),
+            ];
+
+            $created = create_awaiting_payment_order($pdo, $user_id, $cart, $shipping);
+            $lang = get_current_lang();
+            $callbackUrl = site_absolute_url('payment_callback.php', ['lang' => $lang]);
+
+            $iyzico = iyzico_initialize_checkout(
+                $created['order_id'],
+                $created['conversation_id'],
+                (float) $created['total_usd'],
+                $created['lines'],
+                $shipping,
+                $userRow,
+                $callbackUrl,
+                $lang
+            );
+
+            save_payment_record(
+                $pdo,
+                $created['order_id'],
+                $created['conversation_id'],
+                $iyzico['token'],
+                'pending',
+                (float) $iyzico['paid_price_try'],
+                $iyzico['raw'] ?? null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'order_id' => $created['order_id'],
+                'payment_provider' => 'iyzico',
+                'payment_page_url' => $iyzico['payment_page_url'],
+                'token' => $iyzico['token'],
+                'amount_try' => $iyzico['paid_price_try'],
+            ]);
+        } catch (Throwable $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ]);
+        }
         exit;
     }
-
-    try {
-        $userStmt = $pdo->prepare('SELECT user_id, full_name, email FROM users WHERE user_id = ? LIMIT 1');
-        $userStmt->execute([$user_id]);
-        $userRow = $userStmt->fetch(PDO::FETCH_ASSOC) ?: [
-            'user_id' => $user_id,
-            'full_name' => (string) ($shipping['full_name'] ?? 'Customer'),
-            'email' => (string) ($shipping['email'] ?? ''),
-        ];
-
-        $created = create_awaiting_payment_order($pdo, $user_id, $data['cart'], $shipping);
-        $lang = get_current_lang();
-        $callbackUrl = site_absolute_url('payment_callback.php', ['lang' => $lang]);
-
-        $iyzico = iyzico_initialize_checkout(
-            $created['order_id'],
-            $created['conversation_id'],
-            (float) $created['total_usd'],
-            $created['lines'],
-            $shipping,
-            $userRow,
-            $callbackUrl,
-            $lang
-        );
-
-        save_payment_record(
-            $pdo,
-            $created['order_id'],
-            $created['conversation_id'],
-            $iyzico['token'],
-            'pending',
-            (float) $iyzico['paid_price_try'],
-            $iyzico['raw'] ?? null
-        );
-
-        echo json_encode([
-            'success' => true,
-            'order_id' => $created['order_id'],
-            'payment_provider' => 'iyzico',
-            'payment_page_url' => $iyzico['payment_page_url'],
-            'token' => $iyzico['token'],
-            'amount_try' => $iyzico['paid_price_try'],
-        ]);
-    } catch (Throwable $e) {
-        echo json_encode([
-            'success' => false,
-            'error' => $e->getMessage(),
-        ]);
-    }
-    exit;
 }
 
+require_once __DIR__ . '/payments/IyzicoService.php';
 require_login();
 
 $page_title = t('meta.checkout_title', 'ZERA - Checkout');
 $is_checkout = true;
-$iyzico_ready = iyzico_is_configured();
+$iyzico_keys_ok = iyzico_is_configured();
+$iyzico_vendor_ok = iyzico_vendor_available();
+$iyzico_ready = iyzico_checkout_ready();
+$checkout_demo = checkout_demo_mode_enabled() && !$iyzico_keys_ok;
+$checkout_enabled = checkout_can_process();
 $checkout_user_name = $_SESSION['user_name'] ?? '';
 $checkout_user_email = $_SESSION['user_email'] ?? '';
 
 include 'includes/header.php';
 ?>
 
-<link rel="stylesheet" href="assets/css/checkout.css">
+<link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/checkout.css'), ENT_QUOTES, 'UTF-8') ?>">
 
 <main class="checkout-page">
   <div class="checkout-container">
     <h1 class="checkout-title"><?= htmlspecialchars(t('checkout.title', 'Checkout'), ENT_QUOTES, 'UTF-8') ?></h1>
     <p class="checkout-subtitle"><?= htmlspecialchars(t('checkout.subtitle', 'Review your order and complete your purchase securely.'), ENT_QUOTES, 'UTF-8') ?></p>
 
-    <?php if (!$iyzico_ready): ?>
+    <?php if (!$checkout_enabled): ?>
       <div class="checkout-alert checkout-alert--warn">
         <?= htmlspecialchars(t('checkout.iyzico_not_configured', 'iyzico payment is not configured on this server. Add API keys to .env to enable checkout.'), ENT_QUOTES, 'UTF-8') ?>
+      </div>
+    <?php elseif ($iyzico_keys_ok && !$iyzico_vendor_ok): ?>
+      <div class="checkout-alert checkout-alert--warn">
+        <?= htmlspecialchars(t('checkout.vendor_missing', 'iyzico SDK missing: upload the vendor/ folder to the server (run composer install locally, then zip and upload).'), ENT_QUOTES, 'UTF-8') ?>
+      </div>
+    <?php elseif ($checkout_demo): ?>
+      <div class="checkout-alert checkout-alert--warn">
+        <?= htmlspecialchars(t('checkout.demo_mode_notice', 'Demo mode: payment is simulated. No real charge will be made. Set IYZICO_API_KEY in .env for live payments.'), ENT_QUOTES, 'UTF-8') ?>
       </div>
     <?php endif; ?>
 
@@ -187,8 +219,14 @@ include 'includes/header.php';
             </div>
           </section>
 
-          <button type="submit" class="checkout-submit checkout-submit--iyzico" id="checkoutSubmit" <?= $iyzico_ready ? '' : 'disabled' ?>>
-            <?= htmlspecialchars(t('checkout.pay_with_iyzico', 'Pay with iyzico'), ENT_QUOTES, 'UTF-8') ?>
+          <button type="submit" class="checkout-submit checkout-submit--iyzico" id="checkoutSubmit" <?= ($iyzico_ready || $checkout_demo) ? '' : 'disabled' ?>>
+            <?= htmlspecialchars(
+                $checkout_demo
+                    ? t('checkout.complete_demo_order', 'Complete order (demo)')
+                    : t('checkout.pay_with_iyzico', 'Pay with iyzico'),
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>
           </button>
 
           <div class="checkout-trust">

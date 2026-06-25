@@ -66,11 +66,13 @@ window.ORDERS_I18N = ' . json_encode([
     'reorderAdded' => t('orders.reorder_added', 'Items added to cart.'),
 ], JSON_UNESCAPED_UNICODE) . ';
 </script>
-<script src="assets/js/orders.js?v=' . urlencode((string) @filemtime(__DIR__ . '/assets/js/orders.js')) . '"></script>';
+<script src="' . htmlspecialchars(asset_url('assets/js/orders.js'), ENT_QUOTES, 'UTF-8') . '?v='
+    . urlencode((string) @filemtime(__DIR__ . '/assets/js/orders.js'))
+    . '"></script>';
 ?>
 <?php include 'includes/header.php'; ?>
 
-<link rel="stylesheet" href="assets/css/orders.css">
+<link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/orders.css'), ENT_QUOTES, 'UTF-8') ?>">
 
 <div class="orders-page">
   <aside class="orders-sidebar">

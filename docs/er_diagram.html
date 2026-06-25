@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZERA ER Diagram — chatbotv2_db</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #fff; }
+    h1 { font-size: 18px; color: #333; }
+    .note { font-size: 13px; color: #666; margin-bottom: 16px; max-width: 900px; }
+    .mermaid { display: flex; justify-content: center; }
+  </style>
+</head>
+<body>
+  <h1>Figure 4.2 — ZERA entity–relationship diagram (chatbotv2_db)</h1>
+  <p class="note">
+    Wishlist/favorites are stored in browser <code>localStorage</code>, not in the database.
+    Export: open in browser → screenshot or print to PDF. For thesis quality use
+    <a href="https://dbdiagram.io">dbdiagram.io</a> with <code>er_diagram.dbml</code>.
+  </p>
+  <pre class="mermaid">
+erDiagram
+    users ||--o{ orders : "places"
+    users ||--o{ password_resets : "has"
+    users |o--o{ chatbot_feedback : "gives"
+    users ||--o{ support_interactions : "submits"
+
+    categories ||--o{ products : "contains"
+
+    orders ||--|{ order_items : "includes"
+    products ||--o{ order_items : "line_item"
+
+    orders ||--o{ payments : "paid_via"
+
+    products |o--o{ support_interactions : "recommended_in"
+
+    users {
+        int user_id PK
+        varchar full_name
+        varchar email UK
+        varchar password_hash
+        varchar google_id
+        varchar facebook_id
+        varchar phone
+        text address
+        tinyint email_notifications
+        timestamp created_at
+    }
+
+    categories {
+        int category_id PK
+        varchar category_name UK
+    }
+
+    products {
+        int product_id PK
+        varchar external_id UK
+        varchar name
+        decimal price
+        int category_id FK
+        int stock_quantity
+        json badges
+    }
+
+    orders {
+        int order_id PK
+        int user_id FK
+        decimal total_amount
+        varchar status
+        varchar payment_status
+        text shipping_json
+        timestamp created_at
+    }
+
+    order_items {
+        int order_item_id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        decimal unit_price
+    }
+
+    payments {
+        int payment_id PK
+        int order_id
+        varchar provider
+        varchar token
+        varchar status
+        decimal amount
+    }
+
+    password_resets {
+        int reset_id PK
+        int user_id FK
+        char token_hash
+        datetime expires_at
+    }
+
+    support_interactions {
+        int interaction_id PK
+        int user_id FK
+        text message
+        enum sender
+        int recommended_product_id FK
+    }
+
+    chatbot_feedback {
+        int feedback_id PK
+        int user_id FK
+        tinyint helpful
+        varchar intent
+        tinyint used_ai
+    }
+  </pre>
+  <script>mermaid.initialize({ startOnLoad: true, theme: "neutral", er: { layoutDirection: "TB" } });</script>
+</body>
+</html>

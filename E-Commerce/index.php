@@ -1,5 +1,7 @@
 <?php
 require_once 'functions.php';
+require_once __DIR__ . '/chatbot/http_relay.php';
+zera_handle_chat_api_request();
 require_once 'recommended.php';
 
 $page_title = t("meta.home_title", "ZERA - Home");

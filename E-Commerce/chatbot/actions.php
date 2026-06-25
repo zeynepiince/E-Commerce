@@ -306,6 +306,10 @@ function apply_product_search_session_context(
         return ['entities' => $entities, 'userProfile' => $userProfile];
     }
 
+    if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
+        return ['entities' => $entities, 'userProfile' => $userProfile];
+    }
+
     $inheritProductContext = should_inherit_product_search_context($entities, $rawMessage)
         || !empty($entities['_audience_correction']);
     $memoryEntities = is_array($memory['entities'] ?? null) ? $memory['entities'] : [];
@@ -403,6 +407,10 @@ function apply_product_search_session_context(
 
 function should_inherit_product_search_context(array $entities, string $rawMessage): bool
 {
+    if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
+        return false;
+    }
+
     $genericCategories = ['women', 'men', 'clothing', ''];
     $hasSpecificTopic = !empty($entities['product_type'])
         || (!empty($entities['category_like']) && !in_array(to_lower((string) $entities['category_like']), $genericCategories, true));
@@ -1286,52 +1294,61 @@ function handle_intent_action(PDO $pdo, string $intent, string $rawMessage, stri
         $source = "product_followup";
     }
     elseif ($intent === "product_search") {
-
-    if ((function_exists('is_best_sellers_request') && is_best_sellers_request($rawMessage))
-        || !empty($entities['_best_sellers_request'])) {
-        $entities['_best_sellers_request'] = true;
-        $suggestedProducts = fetch_best_seller_products($pdo, 4);
-        $source = "best_sellers";
-    } elseif (is_cheaper_refinement_message($rawMessage) && !empty($memory['last_suggested_products'])) {
-        $suggestedProducts = pick_cheaper_alternative_products($pdo, $memory, $entities, 4);
-    } else {
-        [$suggestedProducts, $entities] = search_products_with_audience_fallback($pdo, $entities, 4);
-    }
-    $suggestedProducts = filter_products_for_entities($suggestedProducts, $entities);
-
-    if (empty($suggestedProducts)) {
-        if (is_numeric($entities['max_price'] ?? null)) {
-            $reply = build_product_reply([], $entities, $lang);
-            $closest = filter_products_for_entities(search_closest_above_budget($pdo, $entities, 1), $entities);
-            if ($closest !== []) {
-                $near = $closest[0];
-                $nearPrice = number_format((float) ($near['price'] ?? 0), 2);
-                $nearName = (string) ($near['name'] ?? 'Product');
-                $reply .= $lang === 'tr'
-                    ? "\n\nEn yakın seçenek: {$nearName} (\${$nearPrice})"
-                    : "\n\nClosest option: {$nearName} (\${$nearPrice})";
-            }
-        } elseif (has_specific_product_query($entities) || is_strict_category_search($entities)) {
-            $reply = build_product_reply([], $entities, $lang);
-        } else {
+        if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
             $suggestedProducts = fetch_top_products($pdo, 4);
-            $reply = $lang === "tr"
-                ? "Şunlara göz atabilirsin:"
-                : "You may like these products:";
+            if ($suggestedProducts === []) {
+                $suggestedProducts = fetch_best_seller_products($pdo, 4);
+            }
+            $reply = build_product_reply($suggestedProducts, $entities, $lang);
+            $redirectUrl = build_products_redirect_url($entities);
+            $source = 'product_search';
+        } else {
+            if ((function_exists('is_best_sellers_request') && is_best_sellers_request($rawMessage))
+                || !empty($entities['_best_sellers_request'])) {
+                $entities['_best_sellers_request'] = true;
+                $suggestedProducts = fetch_best_seller_products($pdo, 4);
+                $source = "best_sellers";
+            } elseif (is_cheaper_refinement_message($rawMessage) && !empty($memory['last_suggested_products'])) {
+                $suggestedProducts = pick_cheaper_alternative_products($pdo, $memory, $entities, 4);
+            } else {
+                [$suggestedProducts, $entities] = search_products_with_audience_fallback($pdo, $entities, 4);
+            }
+            $suggestedProducts = filter_products_for_entities($suggestedProducts, $entities);
+
+            if (empty($suggestedProducts)) {
+                $userBudget = message_specifies_budget($rawMessage);
+                if (is_numeric($entities['max_price'] ?? null) && $userBudget) {
+                    $reply = build_product_reply([], $entities, $lang);
+                    $closest = filter_products_for_entities(search_closest_above_budget($pdo, $entities, 1), $entities);
+                    if ($closest !== []) {
+                        $near = $closest[0];
+                        $nearPrice = number_format((float) ($near['price'] ?? 0), 2);
+                        $nearName = (string) ($near['name'] ?? 'Product');
+                        $reply .= $lang === 'tr'
+                            ? "\n\nEn yakın seçenek: {$nearName} (\${$nearPrice})"
+                            : "\n\nClosest option: {$nearName} (\${$nearPrice})";
+                    }
+                } elseif (has_specific_product_query($entities) || is_strict_category_search($entities)) {
+                    $reply = build_product_reply([], $entities, $lang);
+                } else {
+                    $suggestedProducts = fetch_top_products($pdo, 4);
+                    $reply = $lang === "tr"
+                        ? "Şunlara göz atabilirsin:"
+                        : "You may like these products:";
+                }
+            } else {
+                $reply = build_product_reply($suggestedProducts, $entities, $lang);
+            }
+
+            $redirectUrl = build_products_redirect_url($entities);
+            if ($source !== "best_sellers") {
+                $source = "product_search";
+            }
         }
     } else {
-        $reply = build_product_reply($suggestedProducts, $entities, $lang);
-    }
-
-        $redirectUrl = build_products_redirect_url($entities);
-        if ($source !== "best_sellers") {
-            $source = "product_search";
-        }
-        } else {
         $budgetReply = try_budget_recommendation($pdo, $rawMessage);
         if (is_string($budgetReply) && $budgetReply !== "") { $reply = $budgetReply; $source = "budget_logic"; }
         else $reply = $lang === "tr" ? "Memnuniyetle yardımcı olurum. Ürün önerisi, kargo, iade veya sipariş takibi sorabilirsin." : "Happy to help. You can ask about product recommendations, shipping, returns, or order tracking.";
-        }
-        return [$reply, $suggestedProducts, $redirectUrl, $source, $entities];
     }
-
+    return [$reply, $suggestedProducts, $redirectUrl, $source, $entities];
+}

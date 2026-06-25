@@ -22,16 +22,18 @@ function zera_init_session(): void
     ini_set('session.cookie_httponly', '1');
 
     $secure = zera_is_https();
+    // HTTPS: None allows session cookie on cross-site POST (iyzico payment return).
+    $sameSite = $secure ? 'None' : 'Lax';
     if (PHP_VERSION_ID >= 70300) {
         session_set_cookie_params([
             'lifetime' => 0,
             'path' => '/',
             'secure' => $secure,
             'httponly' => true,
-            'samesite' => 'Lax',
+            'samesite' => $sameSite,
         ]);
     } else {
-        session_set_cookie_params(0, '/; samesite=Lax', '', $secure, true);
+        session_set_cookie_params(0, '/; samesite=' . $sameSite, '', $secure, true);
     }
 
     session_start();
@@ -85,14 +87,24 @@ function csrf_verify(?string $token = null): bool
 
 function csrf_deny(bool $asJson = true): void
 {
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code(403);
     if ($asJson) {
         header('Content-Type: application/json; charset=utf-8');
+        $lang = function_exists('get_current_lang') ? get_current_lang() : 'en';
+        $reply = $lang === 'tr'
+            ? 'Oturum süresi doldu. Sayfayı yenileyip tekrar dene.'
+            : 'Session expired. Please refresh the page and try again.';
         echo json_encode([
             'success' => false,
             'error' => 'Invalid or missing CSRF token',
             'code' => 'csrf_invalid',
-        ]);
+            'reply' => $reply,
+            'intent' => 'csrf_error',
+            'suggested_products' => [],
+        ], JSON_UNESCAPED_UNICODE);
     } else {
         echo 'Forbidden: invalid CSRF token';
     }

@@ -32,6 +32,34 @@ const CHAT_QUICK_ACTIONS_RETURNS_SHIPPING = [
   { en: "How do returns work?", tr: "İade nasıl yapılır?" },
   { en: "Shipping time", tr: "Kargo süresi" }
 ];
+const CHAT_QUICK_ACTION_KEYS = {
+  "🛍️ Recommend me a product": "recommend_product",
+  "🛍️ Bana ürün öner": "recommend_product",
+  "📦 Track my order": "track_order",
+  "📦 Siparişimi takip et": "track_order",
+  "💳 Payment options": "payment_options",
+  "💳 Ödeme seçenekleri": "payment_options",
+  "🔁 How do returns work?": "returns",
+  "🔁 İade nasıl yapılır?": "returns",
+  "Wireless only": "wireless_only",
+  "Kablosuz olsun": "wireless_only",
+  "Cheaper alternatives": "cheaper_alternatives",
+  "Daha ucuz alternatif": "cheaper_alternatives",
+  "Best sellers": "best_sellers",
+  "En çok satanlar": "best_sellers",
+  "Under €100": "under_100",
+  "100 euro altı": "under_100",
+  "Where is my shipment?": "shipment_where",
+  "Kargo nerede?": "shipment_where",
+  "Delivery time": "delivery_time",
+  "Teslimat süresi": "delivery_time",
+  "Cancel my order": "cancel_order",
+  "Siparişi iptal et": "cancel_order",
+  "Do you offer installments?": "installments",
+  "Taksit yapılıyor mu?": "installments",
+  "Shipping time": "shipping_time",
+  "Kargo süresi": "shipping_time"
+};
 
 const ZERA_STORAGE_KEYS = {
   cart: "zera_cart",
@@ -74,7 +102,32 @@ window.zeraStorageGet = zeraStorageGet;
 window.zeraStorageSet = zeraStorageSet;
 
 function appUrl(path) {
-  const url = new URL(path, window.location.href);
+  const clean = String(path || "").replace(/^\//, "");
+  const apiMap = window.ZERA_API && typeof window.ZERA_API === "object" ? window.ZERA_API : {};
+  const apiAliases = {
+    "recommended_api.php": "recommended",
+    "support_chat.php": "chatbot",
+    "chatbot_api.php": "chatbot",
+    "auth_api.php": "auth",
+    "support_feedback.php": "feedback",
+    "chatbot_feedback.php": "feedback",
+    "wishlist_prices.php": "wishlist_prices",
+    "checkout.php": "checkout",
+  };
+  const aliasKey = apiAliases[clean] || (clean === "recommended_api.php" ? "chatbot" : clean.replace(/\.php$/i, ""));
+  if (typeof apiMap[aliasKey] === "string" && apiMap[aliasKey] !== "") {
+    const mapped = new URL(apiMap[aliasKey]);
+    const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "";
+    if (lang && !mapped.searchParams.get("lang")) {
+      mapped.searchParams.set("lang", lang);
+    }
+    return mapped.toString();
+  }
+  const base =
+    (typeof window.ZERA_SITE_BASE === "string" && window.ZERA_SITE_BASE)
+      || (document.querySelector("base") && document.querySelector("base").href)
+      || window.location.href;
+  const url = new URL(clean, base);
   const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "";
   if (lang && !url.searchParams.get("lang")) {
     url.searchParams.set("lang", lang);
@@ -138,7 +191,42 @@ function toggleNavMenu() {
   if (nav) nav.classList.toggle("nav-categories--open");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function zeraDomReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn);
+  } else {
+    fn();
+  }
+}
+
+function zeraBindUiActions() {
+  document.querySelectorAll('[data-action="toggle-auth"]').forEach((el) => {
+    if (el.dataset.zeraBound === "1") return;
+    el.dataset.zeraBound = "1";
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleAuthModal();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-chat"]').forEach((el) => {
+    if (el.dataset.zeraBound === "1") return;
+    el.dataset.zeraBound = "1";
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleChat();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-cart"]').forEach((el) => {
+    if (el.dataset.zeraBound === "1") return;
+    el.dataset.zeraBound = "1";
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleCart();
+    });
+  });
+}
+
+function zeraInitApp() {
   try {
     const saved = zeraStorageGet("cart");
     if (saved) {
@@ -147,34 +235,36 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (e) {
     cart = [];
   }
-  renderCart();
-  loadFavorites();
-  syncFavoriteIdsCookie();
-  loadRecentlyViewed();
-  hydrateFavoritePrices();
-  hydrateFavoritePricesFromServer();
-  hydrateHomeRecommendations();
+
+  try { renderCart(); } catch (e) { console.error("renderCart failed", e); }
+  try { loadFavorites(); } catch (e) { console.error("loadFavorites failed", e); }
+  try { syncFavoriteIdsCookie(); } catch (e) {}
+  try { loadRecentlyViewed(); } catch (e) {}
+  try { hydrateFavoritePrices(); } catch (e) {}
+  try { hydrateFavoritePricesFromServer(); } catch (e) {}
+  try { hydrateHomeRecommendations(); } catch (e) {}
 
   const checkoutSummary = document.getElementById("checkoutCartSummary");
   if (checkoutSummary) {
-    renderCheckoutSummary();
-    initCheckoutPayment();
-    initCheckoutPhoneField();
+    try { renderCheckoutSummary(); } catch (e) {}
+    try { initCheckoutPayment(); } catch (e) {}
+    try { initCheckoutPhoneField(); } catch (e) {}
     const submitBtn = document.getElementById("checkoutSubmit");
     if (submitBtn) submitBtn.disabled = cart.length === 0;
   }
 
-  initHeroSlider();
-  initFlashCountdown();
-  initAuthModal();
-  applyWishlistState();
-  renderWishlistPreview();
-  renderWishlist();
-  renderRecentlyViewed();
-  renderChatQuickPrompts();
+  try { initHeroSlider(); } catch (e) {}
+  try { initFlashCountdown(); } catch (e) {}
+  try { initAuthModal(); } catch (e) { console.error("initAuthModal failed", e); }
+  try { applyWishlistState(); } catch (e) {}
+  try { renderWishlistPreview(); } catch (e) {}
+  try { renderWishlist(); } catch (e) {}
+  try { renderRecentlyViewed(); } catch (e) {}
+  try { renderChatQuickPrompts(); } catch (e) {}
 
   const chatInput = document.getElementById("userInput");
-  if (chatInput) {
+  if (chatInput && chatInput.dataset.zeraBound !== "1") {
+    chatInput.dataset.zeraBound = "1";
     chatInput.addEventListener("input", onUserTyping);
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -184,21 +274,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Event delegation for product card wishlist buttons (data-name = product card)
+  zeraBindUiActions();
+}
+
+if (!window.__ZERA_CLICK_BOUND) {
+  window.__ZERA_CLICK_BOUND = true;
   document.addEventListener("click", (e) => {
-    const btn = e.target.closest(".wishlist-btn[data-name]");
+    const btn = e.target.closest(".wishlist-btn");
     if (!btn) return;
     e.preventDefault();
+    e.stopPropagation();
     const id = parseInt(btn.dataset.id, 10);
-    const name = btn.dataset.name || "Product";
+    if (!id) return;
+    const name = btn.dataset.name || btn.getAttribute("data-name") || "Product";
     const image = btn.dataset.image || "";
     const parsed = parseFloat(btn.dataset.price || "");
     const price = Number.isFinite(parsed) ? parsed : null;
     const stockQuantity = parseInt(btn.dataset.stock || "0", 10);
-    if (id) toggleFavorite(id, name, image, price, stockQuantity);
+    if (typeof toggleFavorite === "function") {
+      toggleFavorite(id, name, image, price, stockQuantity);
+    }
   });
+}
 
-});
+zeraDomReady(zeraInitApp);
 
 function renderChatQuickPrompts(force = false) {
   const container = document.getElementById("quick-actions");
@@ -238,7 +337,8 @@ function sendQuickPrompt(text) {
   if (input) {
     input.value = text;
   }
-  sendChatMessage(text);
+  const quickAction = CHAT_QUICK_ACTION_KEYS[text] || "";
+  sendChatMessage(text, quickAction);
 }
 
 function onUserTyping() {
@@ -316,12 +416,10 @@ function renderChatFeedbackControls(chatBody, botMsg, payload) {
 
 function submitChatFeedback(isHelpful, payload, lockButtons, activeBtn, wrapEl) {
   lockButtons(activeBtn);
-  fetch(appUrl("chatbot_feedback.php"), {
+  fetch(window.ZERA_API?.feedback || appUrl("recommended_api.php"), {
     method: "POST",
-    headers: (typeof window.csrfHeaders === "function"
-      ? window.csrfHeaders({ "Content-Type": "application/json" })
-      : { "Content-Type": "application/json" }),
-    body: JSON.stringify({
+    headers: zeraApiFormHeaders(),
+    body: zeraApiFormBody({
       action: "submit",
       helpful: isHelpful ? 1 : 0,
       intent: payload.intent || "general",
@@ -1034,6 +1132,47 @@ function toggleChat() {
   chat.classList.toggle("active");
 }
 
+function sanitizeMessageForTransport(text) {
+  return String(text || "")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function chatApiUrl(quickAction) {
+  let url = window.ZERA_API?.chatbot || appUrl("recommended_api.php");
+  if (quickAction) {
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.set("quick_action", quickAction);
+    url = parsed.toString();
+  }
+  return url;
+}
+
+function zeraApiFormHeaders() {
+  return typeof window.csrfHeaders === "function"
+    ? window.csrfHeaders({ "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" })
+    : { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" };
+}
+
+function zeraApiFormBody(fields) {
+  const params = new URLSearchParams();
+  if (window.CSRF_TOKEN) {
+    params.set("csrf_token", window.CSRF_TOKEN);
+  }
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (typeof value === "boolean") {
+      params.set(key, value ? "1" : "0");
+    } else if (typeof value === "object") {
+      params.set(key, JSON.stringify(value));
+    } else {
+      params.set(key, String(value));
+    }
+  });
+  return params.toString();
+}
+
 function sendMessage() {
   const input = document.getElementById("userInput");
   if (!input) return;
@@ -1044,12 +1183,14 @@ function sendMessage() {
   sendChatMessage(message);
 }
 
-function sendChatMessage(message) {
+function sendChatMessage(message, quickActionKey) {
   const chatBody = document.getElementById("chatBody");
   if (!chatBody) return;
   const finalMessage = String(message || "").trim();
   if (!finalMessage) return;
   lastUserMessage = finalMessage;
+  const quickAction = String(quickActionKey || CHAT_QUICK_ACTION_KEYS[finalMessage] || "").trim();
+  const transportMessage = sanitizeMessageForTransport(finalMessage);
 
   const userMsg = document.createElement("div");
   userMsg.className = "msg user";
@@ -1057,7 +1198,8 @@ function sendChatMessage(message) {
   chatBody.appendChild(userMsg);
 
   const payload = {
-    message: finalMessage,
+    message: transportMessage || finalMessage,
+    quick_action: quickAction,
     cart,
     page: window.location.pathname
   };
@@ -1072,14 +1214,35 @@ function sendChatMessage(message) {
   chatBody.appendChild(typingMsg);
   chatBody.scrollTop = chatBody.scrollHeight;
 
-  fetch(appUrl("chatbot_api.php"), {
+  fetch(chatApiUrl(quickAction), {
     method: "POST",
-    headers: (typeof window.csrfHeaders === "function"
-      ? window.csrfHeaders({ "Content-Type": "application/json" })
-      : { "Content-Type": "application/json" }),
-    body: JSON.stringify(payload)
+    headers: zeraApiFormHeaders(),
+    credentials: "same-origin",
+    body: zeraApiFormBody(payload)
   })
-    .then(res => res.json())
+    .then(async (res) => {
+      const raw = await res.text();
+      let data = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch (parseErr) {
+        console.error("Chat API returned non-JSON", res.status, raw.slice(0, 300));
+        throw new Error("invalid_json");
+      }
+      if (!data || typeof data !== "object") {
+        throw new Error("empty_response");
+      }
+      if (!res.ok && data.code === "csrf_invalid") {
+        return data;
+      }
+      if (data.reply) {
+        return data;
+      }
+      if (!res.ok) {
+        throw new Error("http_" + res.status);
+      }
+      return data;
+    })
     .then(data => {
       const typing = document.getElementById("chatTypingIndicator");
       if (typing) typing.remove();
@@ -1153,12 +1316,24 @@ function sendChatMessage(message) {
       renderChatQuickPrompts(true);
       chatBody.scrollTop = chatBody.scrollHeight;
     })
-    .catch(() => {
+    .catch((err) => {
       const typing = document.getElementById("chatTypingIndicator");
       if (typing) typing.remove();
       const errMsg = document.createElement("div");
       errMsg.className = "msg bot";
-      errMsg.innerText = uiText("Server error.", "Sunucu hatası.");
+      let message = uiText("Server error.", "Sunucu hatası.");
+      if (err && err.message === "invalid_json") {
+        message = uiText(
+          "Chat service could not be reached. Upload index.php, chatbot/http_relay.php, chatbot/serve_message.php and main.js, then Ctrl+F5.",
+          "Chatbot servisine ulaşılamadı. index.php, chatbot/http_relay.php, chatbot/serve_message.php ve main.js dosyalarını yükleyip Ctrl+F5 ile yenileyin."
+        );
+      } else if (err && String(err.message || "").startsWith("http_404")) {
+        message = uiText(
+          "Chat API not found (404). Check APP_BASE_PATH in .env if the site runs in a subfolder.",
+          "Chat API bulunamadı (404). Site alt klasördeyse .env dosyasında APP_BASE_PATH ayarlayın."
+        );
+      }
+      errMsg.innerText = message;
       chatBody.appendChild(errMsg);
     });
 }
@@ -1450,14 +1625,23 @@ function checkout() {
     btn.textContent = uiText("Redirecting to iyzico...", "iyzico'ya yönlendiriliyor...");
   }
 
-  fetch(appUrl("checkout.php"), {
+  fetch(appUrl("checkout.php?checkout_api=1"), {
     method: "POST",
-    headers: (typeof window.csrfHeaders === "function"
-      ? window.csrfHeaders({ "Content-Type": "application/json" })
-      : { "Content-Type": "application/json" }),
-    body: JSON.stringify({ cart, shipping })
+    headers: zeraApiFormHeaders({ Accept: "application/json" }),
+    credentials: "same-origin",
+    body: zeraApiFormBody({ cart, shipping }),
   })
-    .then(res => res.json())
+    .then(async (res) => {
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        console.error("checkout non-JSON", res.status, raw.slice(0, 400));
+        throw new Error(raw.trim().slice(0, 180) || ("HTTP " + res.status));
+      }
+      return data;
+    })
     .then(data => {
       if (data.success && data.payment_page_url) {
         cart = [];
@@ -1470,7 +1654,9 @@ function checkout() {
         cart = [];
         renderCart();
         saveCart();
-        window.location.href = appUrl("orders.php?order_id=" + data.order_id);
+        const params = new URLSearchParams({ order_id: String(data.order_id) });
+        if (data.demo) params.set("demo", "1");
+        window.location.href = appUrl("orders.php?" + params.toString());
         return;
       }
 
@@ -1478,8 +1664,13 @@ function checkout() {
       let msg = raw;
       if (data.code === "iyzico_not_configured") {
         msg = uiText(
-          "iyzico payment is not configured on this server.",
-          "iyzico ödeme yapılandırması bu sunucuda tanımlı değil."
+          "Payment is not configured. Add iyzico keys to .env or set CHECKOUT_DEMO_MODE=true for demo checkout.",
+          "Ödeme yapılandırılmamış. .env dosyasına iyzico anahtarlarını ekleyin veya demo için CHECKOUT_DEMO_MODE=true ayarlayın."
+        );
+      } else if (data.code === "empty_cart") {
+        msg = uiText(
+          "Cart data was not received by the server. Refresh the page and try again.",
+          "Sepet sunucuya ulaşmadı. Sayfayı yenileyip tekrar deneyin."
         );
       } else if (/insufficient stock/i.test(raw)) {
         msg = uiText(
@@ -1498,8 +1689,12 @@ function checkout() {
         btn.textContent = defaultLabel;
       }
     })
-    .catch(() => {
-      alert(uiText("Network error. Please try again.", "Ağ hatası. Lütfen tekrar deneyin."));
+    .catch((err) => {
+      const detail = err && err.message ? String(err.message) : "";
+      alert(
+        uiText("Network error. Please try again.", "Ağ hatası. Lütfen tekrar deneyin.")
+        + (detail ? "\n\n" + detail : "")
+      );
       if (btn) {
         btn.disabled = false;
         btn.textContent = defaultLabel;
@@ -1550,6 +1745,15 @@ function setAuthModalMessage(text, type) {
   el.className = `auth-modal-message auth-modal-message--${type === "success" ? "success" : "error"}`;
 }
 
+function authApiUrl(action) {
+  let url = window.ZERA_API?.auth || appUrl("auth_api.php");
+  const parsed = new URL(url, window.location.origin);
+  if (action) parsed.searchParams.set("action", action);
+  const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "";
+  if (lang && !parsed.searchParams.get("lang")) parsed.searchParams.set("lang", lang);
+  return parsed.toString();
+}
+
 async function submitAuthModalForm(action, form) {
   const submitBtn = form.querySelector('[type="submit"]');
   const lang = typeof window.APP_LANG === "string" ? window.APP_LANG : "en";
@@ -1571,21 +1775,19 @@ async function submitAuthModalForm(action, form) {
   setAuthModalMessage("", "");
 
   try {
-    const res = await fetch(appUrl("auth_api.php"), {
+    const res = await fetch(authApiUrl(action), {
       method: "POST",
-      headers: (typeof window.csrfHeaders === "function"
-        ? window.csrfHeaders({
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          })
-        : {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          }),
+      headers: zeraApiFormHeaders({ Accept: "application/json" }),
       credentials: "same-origin",
-      body: JSON.stringify(payload),
+      body: zeraApiFormBody(payload),
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      console.error("auth_api non-JSON response", res.status, raw.slice(0, 400));
+    }
 
     if (data.success) {
       if ((action === "join" && data.active_tab === "signin") || action === "forgot") {
@@ -1602,7 +1804,10 @@ async function submitAuthModalForm(action, form) {
     }
 
     setAuthModalMessage(
-      data.message || authModalI18n("generic_error", "Something went wrong. Please try again."),
+      data.message || data.reply || data.error
+        || (res.status >= 500
+          ? (lang === "tr" ? "Sunucu hatası. Lütfen daha sonra tekrar deneyin." : "Server error. Please try again later.")
+          : authModalI18n("generic_error", "Something went wrong. Please try again.")),
       data.message_type || "error"
     );
     const modal = document.getElementById("authModal");
@@ -1709,4 +1914,14 @@ function initAuthModal() {
     }
   });
 }
+
+window.toggleNavMenu = toggleNavMenu;
+window.toggleCart = toggleCart;
+window.toggleChat = toggleChat;
+window.toggleAuthModal = toggleAuthModal;
+window.toggleFavorite = toggleFavorite;
+window.addToCart = addToCart;
+window.goToCheckout = goToCheckout;
+window.sendMessage = sendMessage;
+window.zeraInitApp = zeraInitApp;
 

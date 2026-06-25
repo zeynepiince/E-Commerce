@@ -1,0 +1,119 @@
+// ZERA — chatbotv2_db ER diagram
+// Import at https://dbdiagram.io/d  →  Export PNG/SVG for thesis Figure 4.2
+// Wishlist/favorites: browser localStorage only (no table)
+
+Project chatbotv2_db {
+  database_type: "MySQL"
+  Note: "9 tables · utf8mb4_unicode_ci · wishlist not in DB"
+}
+
+Table users {
+  user_id int [pk, increment]
+  full_name varchar
+  email varchar [unique]
+  password_hash varchar
+  google_id varchar [null]
+  facebook_id varchar [null]
+  phone varchar [null]
+  address text [null]
+  email_notifications tinyint [default: 1]
+  created_at timestamp
+}
+
+Table categories {
+  category_id int [pk, increment]
+  category_name varchar [unique]
+}
+
+Table products {
+  product_id int [pk, increment]
+  external_id varchar [unique, null]
+  name varchar
+  price decimal
+  image_url text [null]
+  is_featured tinyint
+  badges json [null]
+  category_id int [ref: > categories.category_id, null]
+  sub_category varchar [null]
+  description text [null]
+  stock_quantity int
+  sizes varchar [null]
+}
+
+Table orders {
+  order_id int [pk, increment]
+  user_id int [ref: > users.user_id]
+  total_amount decimal
+  status varchar
+  payment_method varchar [null]
+  payment_status varchar
+  payment_provider varchar [null]
+  shipping_json text [null]
+  tracking_number varchar [null]
+  carrier varchar [null]
+  shipped_at datetime [null]
+  delivered_at datetime [null]
+  created_at timestamp
+}
+
+Table order_items {
+  order_item_id int [pk, increment]
+  order_id int [ref: > orders.order_id]
+  product_id int [ref: > products.product_id, null]
+  quantity int
+  unit_price decimal
+}
+
+Table payments {
+  payment_id int [pk, increment]
+  order_id int [note: "indexed, no formal FK in schema"]
+  provider varchar
+  conversation_id varchar
+  token varchar [null]
+  status varchar
+  amount decimal
+  currency varchar
+  raw_response json [null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table password_resets {
+  reset_id int [pk, increment]
+  user_id int [ref: > users.user_id]
+  token_hash char
+  expires_at datetime
+  used_at datetime [null]
+  created_at timestamp
+}
+
+Table support_interactions {
+  interaction_id int [pk, increment]
+  user_id int [ref: > users.user_id]
+  message text
+  sender varchar
+  intent varchar [null]
+  recommended_product_id int [ref: > products.product_id, null]
+  created_at timestamp
+}
+
+Table chatbot_feedback {
+  feedback_id int [pk, increment]
+  user_id int [ref: > users.user_id, null]
+  helpful tinyint
+  intent varchar [null]
+  source varchar [null]
+  confidence decimal [null]
+  used_ai tinyint
+  escalated_to_human tinyint
+  experiment_mode varchar [null]
+  experiment_bucket varchar [null]
+  experiment_variants json [null]
+  user_message text [null]
+  bot_reply text [null]
+  page varchar [null]
+  created_at timestamp
+}
+
+// Explicit relationship labels (dbdiagram renders cardinality automatically)
+Ref: orders.order_id < payments.order_id [note: "paid_via (1:N attempts)"]

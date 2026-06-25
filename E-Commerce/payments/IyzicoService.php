@@ -20,9 +20,9 @@ function iyzico_options(): Options
 {
     payments_autoload();
 
-    $apiKey = trim((string) (getenv('IYZICO_API_KEY') ?: ''));
-    $secretKey = trim((string) (getenv('IYZICO_SECRET_KEY') ?: ''));
-    $baseUrl = trim((string) (getenv('IYZICO_BASE_URL') ?: 'https://sandbox-api.iyzipay.com'));
+    $apiKey = trim((string) (function_exists('zera_env') ? zera_env('IYZICO_API_KEY', '') : getenv('IYZICO_API_KEY')) ?: '');
+    $secretKey = trim((string) (function_exists('zera_env') ? zera_env('IYZICO_SECRET_KEY', '') : getenv('IYZICO_SECRET_KEY')) ?: '');
+    $baseUrl = trim((string) (function_exists('zera_env') ? zera_env('IYZICO_BASE_URL', 'https://sandbox-api.iyzipay.com') : getenv('IYZICO_BASE_URL')) ?: 'https://sandbox-api.iyzipay.com');
 
     if ($apiKey === '' || $secretKey === '') {
         throw new RuntimeException('iyzico API keys are not configured');
@@ -38,8 +38,33 @@ function iyzico_options(): Options
 
 function iyzico_is_configured(): bool
 {
-    return trim((string) (getenv('IYZICO_API_KEY') ?: '')) !== ''
-        && trim((string) (getenv('IYZICO_SECRET_KEY') ?: '')) !== '';
+    $apiKey = function_exists('zera_env') ? zera_env('IYZICO_API_KEY', '') : getenv('IYZICO_API_KEY');
+    $secretKey = function_exists('zera_env') ? zera_env('IYZICO_SECRET_KEY', '') : getenv('IYZICO_SECRET_KEY');
+    return trim((string) ($apiKey ?? '')) !== '' && trim((string) ($secretKey ?? '')) !== '';
+}
+
+function iyzico_checkout_ready(): bool
+{
+    return iyzico_is_configured() && iyzico_vendor_available();
+}
+
+/** Demo checkout — gerçek ödeme olmadan sipariş tamamlama. */
+function checkout_demo_mode_enabled(): bool
+{
+    $flag = function_exists('zera_env') ? zera_env('CHECKOUT_DEMO_MODE') : getenv('CHECKOUT_DEMO_MODE');
+    if ($flag === null || $flag === false || $flag === '') {
+        return !iyzico_is_configured();
+    }
+    $flag = strtolower(trim((string) $flag));
+    if (in_array($flag, ['0', 'false', 'no', 'off'], true)) {
+        return false;
+    }
+    return in_array($flag, ['1', 'true', 'yes', 'on'], true);
+}
+
+function checkout_can_process(): bool
+{
+    return iyzico_checkout_ready() || checkout_demo_mode_enabled();
 }
 
 /**
@@ -92,7 +117,7 @@ function iyzico_initialize_checkout(
     $buyer->setSurname($lastName);
     $buyer->setGsmNumber($phone);
     $buyer->setEmail((string) ($shipping['email'] ?? $userRow['email'] ?? 'customer@example.com'));
-    $buyer->setIdentityNumber((string) (getenv('IYZICO_DEFAULT_IDENTITY') ?: '11111111111'));
+    $buyer->setIdentityNumber((string) ((function_exists('zera_env') ? zera_env('IYZICO_DEFAULT_IDENTITY', '11111111111') : getenv('IYZICO_DEFAULT_IDENTITY')) ?: '11111111111'));
     $buyer->setRegistrationAddress((string) ($shipping['address'] ?? 'Address'));
     $buyer->setIp($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
     $buyer->setCity((string) ($shipping['city'] ?? 'Istanbul'));

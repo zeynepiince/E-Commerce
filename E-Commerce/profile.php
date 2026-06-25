@@ -128,7 +128,7 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
 ?>
 <?php include 'includes/header.php'; ?>
 
-<link rel="stylesheet" href="assets/css/profile.css">
+<link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/profile.css'), ENT_QUOTES, 'UTF-8') ?>">
 
 <div class="profile-page">
   <aside class="profile-sidebar">
@@ -293,5 +293,5 @@ $page_title = t("meta.profile_title", "ZERA - Profile");
   </main>
 </div>
 
-<script src="assets/js/profile.js"></script>
+<script src="<?= htmlspecialchars(asset_url('assets/js/profile.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <?php include 'includes/footer.php'; ?>

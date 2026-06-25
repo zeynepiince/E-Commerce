@@ -17,7 +17,7 @@ $reviewCount = $reviewCount ?? rand(12, 340);
   <?php if ($badge): ?>
     <span class="home-product-badge home-product-badge--<?= htmlspecialchars(strtolower(str_replace(' ', '-', $badge)), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($badge, ENT_QUOTES, 'UTF-8') ?></span>
   <?php endif; ?>
-  <button type="button" class="home-product-wishlist wishlist-btn" data-id="<?= $productId ?>" onclick="toggleFavorite(<?= $productId ?>,<?= json_encode($productName) ?>,<?= json_encode($imageUrl) ?>)">♡</button>
+  <button type="button" class="home-product-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>">♡</button>
   <a href="<?= htmlspecialchars(localized_path('product_detail.php', ['name' => $productName]), ENT_QUOTES, 'UTF-8') ?>" class="home-product-link">
     <div class="home-product-image">
       <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1542291026-7eec264c27ff';this.onerror=null;">

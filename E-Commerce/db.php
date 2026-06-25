@@ -30,29 +30,50 @@ if (!function_exists('zera_load_dotenv')) {
             }
             $key = trim(substr($line, 0, $eq));
             $val = trim(substr($line, $eq + 1));
-            // strip surrounding quotes
             if ((str_starts_with($val, '"') && str_ends_with($val, '"'))
                 || (str_starts_with($val, "'") && str_ends_with($val, "'"))) {
                 $val = substr($val, 1, -1);
             }
-            if (getenv($key) === false) {
-                putenv("{$key}={$val}");
-                $_ENV[$key] = $val;
+            if ($key === '') {
+                continue;
             }
+            $_ENV[$key] = $val;
+            $_SERVER[$key] = $val;
+            @putenv("{$key}={$val}");
         }
     }
 }
 
-zera_load_dotenv(__DIR__ . '/.env');
+if (!function_exists('zera_env')) {
+    /** .env okuma — paylaşımlı hostingde getenv() tek başına yeterli olmayabilir. */
+    function zera_env(string $key, ?string $default = null): ?string
+    {
+        if (isset($_ENV[$key]) && is_string($_ENV[$key]) && $_ENV[$key] !== '') {
+            return $_ENV[$key];
+        }
+        $fromGetenv = getenv($key);
+        if ($fromGetenv !== false && $fromGetenv !== '') {
+            return (string) $fromGetenv;
+        }
+        if (isset($_SERVER[$key]) && is_string($_SERVER[$key]) && $_SERVER[$key] !== '') {
+            return $_SERVER[$key];
+        }
+        return $default;
+    }
+}
+
+foreach (['.env', 'zera.env'] as $envFile) {
+    zera_load_dotenv(__DIR__ . '/' . $envFile);
+}
 
 $cfg = [
-    'host'    => getenv('DB_HOST')    ?: 'localhost',
-    'port'    => getenv('DB_PORT')    ?: '',
-    'name'    => getenv('DB_NAME')    ?: 'chatbotv2_db',
-    'user'    => getenv('DB_USER')    ?: 'root',
-    'pass'    => getenv('DB_PASS')    !== false ? getenv('DB_PASS') : 'root',
-    'socket'  => getenv('DB_SOCKET')  ?: '',
-    'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
+    'host'    => zera_env('DB_HOST', 'localhost') ?? 'localhost',
+    'port'    => zera_env('DB_PORT', '') ?? '',
+    'name'    => zera_env('DB_NAME', 'chatbotv2_db') ?? 'chatbotv2_db',
+    'user'    => zera_env('DB_USER', 'root') ?? 'root',
+    'pass'    => zera_env('DB_PASS', 'root') ?? 'root',
+    'socket'  => zera_env('DB_SOCKET', '') ?? '',
+    'charset' => zera_env('DB_CHARSET', 'utf8mb4') ?? 'utf8mb4',
 ];
 
 // DSN: tek bir yapıyla hem TCP (host+port) hem unix socket destekli

@@ -88,6 +88,76 @@ function is_best_sellers_request(string $message): bool
     );
 }
 
+function is_generic_product_recommendation_request(string $message, string $quickAction = ''): bool
+{
+    if ($quickAction === 'recommend_product') {
+        return true;
+    }
+
+    $lower = to_lower(trim($message));
+    $normalized = preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE00}-\x{FE0F}]/u', '', $lower);
+    $normalized = trim((string) preg_replace('/\s+/u', ' ', $normalized));
+
+    $exactPhrases = [
+        'bana ürün öner',
+        'ürün öner',
+        'bana bir ürün öner',
+        'ürün önerir misin',
+        'recommend me a product',
+        'recommend a product',
+        'suggest me a product',
+        'suggest a product',
+    ];
+    if (in_array($normalized, $exactPhrases, true)) {
+        return true;
+    }
+
+    if (message_specifies_budget($message)) {
+        return false;
+    }
+    if (message_mentions_product_terms($message)) {
+        return false;
+    }
+
+    return (bool) preg_match(
+        '/^(?:'
+        . 'bana\s+(?:bir\s+)?ürün\s+öner'
+        . '|ürün\s+öner(?:ir\s+misin)?'
+        . '|recommend(?:\s+me)?(?:\s+a)?\s+product'
+        . '|suggest(?:\s+me)?(?:\s+a)?\s+product'
+        . ')$/ui',
+        $normalized
+    );
+}
+
+function message_specifies_budget(string $message): bool
+{
+    if (!function_exists('parse_shopping_budget')) {
+        return (bool) preg_match('/\d/', $message)
+            && preg_match('/\b(alt[ıi]|altinda|altında|under|below|€|\$|eur|euro|tl|try)\b/ui', $message);
+    }
+    $parsed = parse_shopping_budget($message);
+    return $parsed['max_price_usd'] !== null || $parsed['min_price_usd'] !== null;
+}
+
+/**
+ * @param array<string, mixed> $entities
+ * @return array<string, mixed>
+ */
+function reset_entities_for_generic_recommendation(array $entities): array
+{
+    $entities['_generic_recommend'] = true;
+    $entities['max_price'] = null;
+    $entities['min_price'] = null;
+    $entities['budget'] = ['min' => null, 'max' => null, 'currency' => 'USD'];
+    $entities['category_like'] = null;
+    $entities['product_type'] = null;
+    $entities['keywords'] = [];
+    $entities['sort_by'] = 'featured_price';
+    unset($entities['_cheaper_refinement'], $entities['_best_sellers_request']);
+    return $entities;
+}
+
 function detect_intent(string $message): string
 {
     if (preg_match('/\b((?:xxs|xs|s|m|l|xl|xxl|2xl|3xl)\s+beden|beden(?:i)?\s+(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl)|sizes?|beden|numara)\b.*\b(var\s+m[ıi]|available|mevcut)\b/ui', $message)

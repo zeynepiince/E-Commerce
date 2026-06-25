@@ -3,20 +3,11 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/auth/AuthService.php';
 require_once __DIR__ . '/auth/OAuthService.php';
 
-// Ensure users table exists
+// Ensure users table exists with the expected schema
 try {
-    $pdo->exec("
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY (email)
-      )
-    ");
+    ensure_users_table($pdo);
 } catch (PDOException $e) {
-    // Table may already exist with different structure
+    error_log('auth.php ensure_users_table: ' . $e->getMessage());
 }
 
 $returnUrl = auth_safe_return_url($_GET['return'] ?? $_POST['return'] ?? null);
@@ -93,7 +84,7 @@ $currentLang = function_exists('get_current_lang') ? get_current_lang() : 'en';
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8') ?></title>
-  <link rel="stylesheet" href="auth.css?v=1">
+  <link rel="stylesheet" href="<?= htmlspecialchars(asset_url('auth.css'), ENT_QUOTES, 'UTF-8') ?>?v=1">
 </head>
 <body>
   <div class="auth-split">
@@ -263,6 +254,6 @@ $currentLang = function_exists('get_current_lang') ? get_current_lang() : 'en';
   </div>
 
   <script>window.CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;</script>
-  <script src="auth.js"></script>
+  <script src="<?= htmlspecialchars(asset_url('auth.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

@@ -18,13 +18,13 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $page_title = t('admin.orders_title', 'Order Management | ZERA');
 $is_admin_orders = true;
-$page_footer_scripts = '<script src="assets/js/admin_orders.js?v='
+$page_footer_scripts = '<script src="' . htmlspecialchars(asset_url('assets/js/admin_orders.js'), ENT_QUOTES, 'UTF-8') . '?v='
     . urlencode((string) @filemtime(__DIR__ . '/assets/js/admin_orders.js'))
     . '"></script>';
 include 'includes/header.php';
 ?>
 
-<link rel="stylesheet" href="assets/css/admin_orders.css">
+<link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/admin_orders.css'), ENT_QUOTES, 'UTF-8') ?>">
 
 <main class="admin-orders-page">
   <div class="admin-orders-container">

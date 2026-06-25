@@ -193,6 +193,26 @@ function mark_order_payment_paid(PDO $pdo, int $orderId): void
     $stmt->execute([$orderId]);
 }
 
+/**
+ * Demo / test checkout — iyzico olmadan siparişi tamamlar.
+ *
+ * @param array<string, mixed> $shipping
+ * @return array{order_id: int, total_usd: float, conversation_id: string}
+ */
+function complete_demo_checkout(PDO $pdo, int $userId, array $cart, array $shipping): array
+{
+    $created = create_awaiting_payment_order($pdo, $userId, $cart, $shipping);
+    $orderId = (int) $created['order_id'];
+
+    $providerStmt = $pdo->prepare("UPDATE orders SET payment_provider = 'demo' WHERE order_id = ?");
+    $providerStmt->execute([$orderId]);
+
+    fulfill_order_stock($pdo, $orderId);
+    mark_order_payment_paid($pdo, $orderId);
+
+    return $created;
+}
+
 function mark_order_payment_failed(PDO $pdo, int $orderId): void
 {
     $stmt = $pdo->prepare(

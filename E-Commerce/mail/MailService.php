@@ -1,9 +1,21 @@
 <?php
 
-use PHPMailer\PHPMailer\Exception as MailException;
-use PHPMailer\PHPMailer\PHPMailer;
-
-require_once __DIR__ . '/../vendor/autoload.php';
+function mail_load_phpmailer(): bool
+{
+    static $loaded = false;
+    static $available = false;
+    if ($loaded) {
+        return $available;
+    }
+    $loaded = true;
+    $autoload = __DIR__ . '/../vendor/autoload.php';
+    if (!is_readable($autoload)) {
+        return false;
+    }
+    require_once $autoload;
+    $available = class_exists(\PHPMailer\PHPMailer\PHPMailer::class);
+    return $available;
+}
 
 function mail_is_enabled(): bool
 {
@@ -46,12 +58,17 @@ function send_html_mail(string $toEmail, string $toName, string $subject, string
         return false;
     }
 
+    if (!mail_load_phpmailer()) {
+        error_log('Mail skipped: PHPMailer not installed (run composer install in E-Commerce).');
+        return false;
+    }
+
     $toEmail = trim($toEmail);
     if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         return false;
     }
 
-    $mail = new PHPMailer(true);
+    $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
     try {
         $smtp = mail_smtp_config();
@@ -65,9 +82,9 @@ function send_html_mail(string $toEmail, string $toName, string $subject, string
                 $mail->Password = $smtp['pass'];
             }
             if ($smtp['encryption'] === 'ssl') {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
             } elseif ($smtp['encryption'] === 'tls') {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             } else {
                 $mail->SMTPSecure = false;
                 $mail->SMTPAutoTLS = false;
@@ -86,7 +103,7 @@ function send_html_mail(string $toEmail, string $toName, string $subject, string
 
         $mail->send();
         return true;
-    } catch (MailException $e) {
+    } catch (\PHPMailer\PHPMailer\Exception $e) {
         error_log('Mail send failed: ' . $e->getMessage());
         return false;
     }

@@ -34,6 +34,86 @@ function parse_favorite_product_ids(mixed $raw): array
 }
 
 /**
+ * POST gövdesini okur (JSON, urlencoded veya $_POST).
+ * Paylaşımlı hosting ortamlarında Content-Type başlığı eksik/bozuk olabilir.
+ *
+ * @return array<string, mixed>
+ */
+function zera_read_post_payload(): array
+{
+    $payload = [];
+    $raw = file_get_contents('php://input') ?: '';
+    if ($raw !== '') {
+        $trimmed = ltrim($raw);
+        if ($trimmed !== '' && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $payload = zera_normalize_post_payload($decoded);
+            }
+        } else {
+            $form = [];
+            parse_str($raw, $form);
+            if (is_array($form) && $form !== []) {
+                $payload = zera_normalize_post_payload($form);
+            }
+        }
+    }
+    if ($payload === [] && $_POST !== []) {
+        $payload = zera_normalize_post_payload($_POST);
+    }
+    return zera_merge_request_payload_fallback($payload);
+}
+
+/**
+ * Hosting POST gövdesini sildiğinde GET / $_REQUEST yedeklerini birleştirir.
+ *
+ * @param array<string, mixed> $payload
+ * @return array<string, mixed>
+ */
+function zera_merge_request_payload_fallback(array $payload): array
+{
+    $sources = [$_GET, $_REQUEST];
+    foreach (['message', 'quick_action', 'page', 'action', 'helpful'] as $key) {
+        if (($payload[$key] ?? '') !== '') {
+            continue;
+        }
+        foreach ($sources as $source) {
+            if (!is_array($source) || !isset($source[$key])) {
+                continue;
+            }
+            $value = $source[$key];
+            if (is_string($value) && $value !== '') {
+                $payload[$key] = $value;
+                break;
+            }
+            if (is_numeric($value)) {
+                $payload[$key] = $value;
+                break;
+            }
+        }
+    }
+    return $payload;
+}
+
+/**
+ * @param array<string, mixed> $payload
+ * @return array<string, mixed>
+ */
+function zera_normalize_post_payload(array $payload): array
+{
+    foreach (['cart', 'experiment_variants', 'favorite_ids', 'shipping'] as $key) {
+        if (!isset($payload[$key]) || !is_string($payload[$key])) {
+            continue;
+        }
+        $decoded = json_decode($payload[$key], true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            $payload[$key] = $decoded;
+        }
+    }
+    return $payload;
+}
+
+/**
  * Giriş yapmamış kullanıcıyı reddeder.
  *   - JSON istekleri (API) için 401 + JSON döner.
  *   - Sayfa istekleri için auth.php'ye yönlendirir; geri dönüş URL'sini ?return= olarak iletir.
@@ -70,7 +150,8 @@ function require_login(): int
 
 function admin_email(): string
 {
-    return strtolower(trim((string) (getenv('ADMIN_EMAIL') ?: '')));
+    $raw = function_exists('zera_env') ? zera_env('ADMIN_EMAIL', '') : getenv('ADMIN_EMAIL');
+    return strtolower(trim((string) ($raw ?: '')));
 }
 
 function is_admin_user(): bool

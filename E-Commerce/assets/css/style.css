@@ -816,6 +816,17 @@ body.cart-open .chat-toggle{
   border:none;
   cursor:pointer;
   z-index:2147483646 !important;
+  box-shadow:0 8px 24px rgba(255,111,0,.45);
+}
+
+/* Free hosts (InfinityFree etc.) inject bottom ad bars — lift chat above them */
+@media (max-width:768px){
+  .chat-toggle{
+    bottom:88px;
+  }
+  .chatbot{
+    bottom:170px;
+  }
 }
 
 .chatbot{

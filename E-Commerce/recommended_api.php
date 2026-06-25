@@ -13,15 +13,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 csrf_require(true);
 
-$payload = $_POST;
-$contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? '');
-if (stripos($contentType, 'application/json') !== false) {
-    $decoded = json_decode(file_get_contents('php://input') ?: '', true);
-    if (is_array($decoded)) {
-        $payload = $decoded;
-    }
+$payload = zera_read_post_payload();
+
+// --- Chat message (InfinityFree blocks chatbot_*.php URLs) ---
+$hasChatMessage = array_key_exists('message', $payload)
+    || trim((string) ($payload['quick_action'] ?? '')) !== ''
+    || trim((string) ($_GET['quick_action'] ?? '')) !== '';
+if ($hasChatMessage) {
+    require_once __DIR__ . '/chatbot/helpers.php';
+    require_once __DIR__ . '/chatbot/responses.php';
+    require_once __DIR__ . '/chatbot/actions.php';
+    require_once __DIR__ . '/chatbot/ai.php';
+    require_once __DIR__ . '/chatbot/intent.php';
+    require_once __DIR__ . '/chatbot/consistency.php';
+    $data = $payload;
+    require __DIR__ . '/chatbot/serve_message.php';
+    exit;
 }
 
+// --- Chat feedback (👍/👎) ---
+if (($payload['action'] ?? '') === 'submit' && array_key_exists('helpful', $payload)) {
+    $data = $payload;
+    require __DIR__ . '/chatbot/serve_feedback.php';
+    exit;
+}
+
+// --- Homepage recommendation grid ---
 $favoriteIds = parse_favorite_product_ids($payload['favorite_ids'] ?? []);
 $userId = !empty($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : 0;
 $limit = is_numeric($payload['limit'] ?? null) ? max(1, min(8, (int) $payload['limit'])) : 4;

@@ -6,7 +6,7 @@ $page_title = t("meta.wishlist_title", "ZERA - Favorites");
 
 <?php include 'includes/header.php'; ?>
 
-<link rel="stylesheet" href="assets/css/wishlist.css?v=2">
+<link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/wishlist.css'), ENT_QUOTES, 'UTF-8') ?>?v=2">
 
 <div class="wishlist-page">
   <div class="wishlist-container">

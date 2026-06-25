@@ -13,6 +13,9 @@ function ensure_application_schema(PDO $pdo): void
     $done = true;
 
     ensure_product_catalog_columns($pdo);
+    ensure_users_table($pdo);
+    ensure_orders_payment_schema($pdo);
+    ensure_payments_table($pdo);
     ensure_chatbot_feedback_table($pdo);
     ensure_support_interactions_table($pdo);
     ensure_support_interactions_sender_check($pdo);
@@ -56,6 +59,101 @@ function ensure_product_catalog_columns(PDO $pdo): void
 
     if ($alters !== []) {
         $pdo->exec('ALTER TABLE products ' . implode(', ', $alters));
+    }
+}
+
+function ensure_users_table(PDO $pdo): void
+{
+    if (!table_exists($pdo, 'users')) {
+        $pdo->exec("
+            CREATE TABLE users (
+              user_id INT NOT NULL AUTO_INCREMENT,
+              full_name VARCHAR(255) NOT NULL,
+              email VARCHAR(255) NOT NULL,
+              password_hash VARCHAR(255) NOT NULL,
+              created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (user_id),
+              UNIQUE KEY uq_users_email (email)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        return;
+    }
+
+    try {
+        if (!column_exists($pdo, 'users', 'user_id') && column_exists($pdo, 'users', 'id')) {
+            $pdo->exec('ALTER TABLE users CHANGE COLUMN id user_id INT NOT NULL AUTO_INCREMENT');
+        }
+        if (!column_exists($pdo, 'users', 'full_name') && column_exists($pdo, 'users', 'name')) {
+            $pdo->exec('ALTER TABLE users CHANGE COLUMN name full_name VARCHAR(255) NOT NULL');
+        }
+        if (!column_exists($pdo, 'users', 'full_name')) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN full_name VARCHAR(255) NOT NULL DEFAULT ''");
+        }
+        if (!column_exists($pdo, 'users', 'password_hash')) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''");
+        }
+        if (!column_exists($pdo, 'users', 'email')) {
+            $pdo->exec('ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL');
+        }
+    } catch (Throwable $e) {
+        error_log('ensure_users_table: ' . $e->getMessage());
+    }
+}
+
+function ensure_orders_payment_schema(PDO $pdo): void
+{
+    if (!table_exists($pdo, 'orders')) {
+        return;
+    }
+
+    $alters = [];
+    if (!column_exists($pdo, 'orders', 'payment_status')) {
+        $alters[] = "ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT 'awaiting_payment'";
+    }
+    if (!column_exists($pdo, 'orders', 'payment_provider')) {
+        $alters[] = 'ADD COLUMN payment_provider VARCHAR(32) NULL DEFAULT NULL';
+    }
+    if (!column_exists($pdo, 'orders', 'shipping_json')) {
+        $alters[] = 'ADD COLUMN shipping_json TEXT NULL';
+    }
+
+    if ($alters !== []) {
+        try {
+            $pdo->exec('ALTER TABLE orders ' . implode(', ', $alters));
+        } catch (Throwable $e) {
+            error_log('ensure_orders_payment_schema: ' . $e->getMessage());
+        }
+    }
+}
+
+function ensure_payments_table(PDO $pdo): void
+{
+    if (table_exists($pdo, 'payments')) {
+        return;
+    }
+
+    try {
+        $pdo->exec("
+            CREATE TABLE payments (
+              payment_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              order_id INT NOT NULL,
+              provider VARCHAR(32) NOT NULL DEFAULT 'iyzico',
+              conversation_id VARCHAR(64) NOT NULL,
+              token VARCHAR(255) NULL DEFAULT NULL,
+              status VARCHAR(32) NOT NULL DEFAULT 'pending',
+              amount DECIMAL(12,2) NOT NULL,
+              currency VARCHAR(3) NOT NULL DEFAULT 'TRY',
+              raw_response JSON NULL,
+              created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (payment_id),
+              KEY idx_payments_order (order_id),
+              KEY idx_payments_token (token),
+              KEY idx_payments_conversation (conversation_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    } catch (Throwable $e) {
+        error_log('ensure_payments_table: ' . $e->getMessage());
     }
 }
 
