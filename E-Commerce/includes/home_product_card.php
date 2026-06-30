@@ -2,8 +2,12 @@
 if (!function_exists("t")) {
   require_once __DIR__ . "/../functions.php";
 }
-$cartId = isset($product['name']) ? abs(crc32($product['name'])) : (($idx ?? 0) + 1);
-$productId = (int) ($cartId ?: (($idx ?? 0) + 1));
+$productId = (int) ($product['product_id'] ?? (($idx ?? 0) + 1));
+if ($productId <= 0 && isset($product['name'])) {
+    $productId = (int) abs(crc32((string) $product['name']));
+}
+$stockQuantity = (int) ($product['stock_quantity'] ?? 0);
+$inStock = $stockQuantity > 0;
 $imageUrl = !empty($product['image_url']) ? $product['image_url'] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff';
 $productName = $product['name'] ?? t("product.card.fallback_name", "Product");
 $productPrice = (float) ($product['price'] ?? 0);
@@ -17,7 +21,7 @@ $reviewCount = $reviewCount ?? rand(12, 340);
   <?php if ($badge): ?>
     <span class="home-product-badge home-product-badge--<?= htmlspecialchars(strtolower(str_replace(' ', '-', $badge)), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($badge, ENT_QUOTES, 'UTF-8') ?></span>
   <?php endif; ?>
-  <button type="button" class="home-product-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>">♡</button>
+  <button type="button" class="home-product-wishlist wishlist-btn" data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>" data-stock="<?= (int) $stockQuantity ?>">♡</button>
   <a href="<?= htmlspecialchars(localized_path('product_detail.php', ['name' => $productName]), ENT_QUOTES, 'UTF-8') ?>" class="home-product-link">
     <div class="home-product-image">
       <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1542291026-7eec264c27ff';this.onerror=null;">
@@ -36,6 +40,6 @@ $reviewCount = $reviewCount ?? rand(12, 340);
     <?php if (!empty($sizeList)): ?>
       <p class="home-product-reviews"><?= htmlspecialchars(t("product.card.size", "Size"), ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars(implode(" · ", $sizeList), ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
-    <button type="button" class="home-product-add" onclick="addToCartWithSelectedSize(this, <?= $productId ?>,<?= json_encode($productName) ?>,<?= $productPrice ?>,<?= json_encode($imageUrl) ?>)"><?= htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') ?></button>
+    <button type="button" class="home-product-add <?= !$inStock ? 'product-card-add--disabled' : '' ?>" <?= !$inStock ? 'disabled' : '' ?> onclick='<?= $inStock ? "addToCart(" . $productId . ", " . json_encode($productName) . ", " . $productPrice . ", " . json_encode($imageUrl) . ")" : "return false;" ?>'><?= $inStock ? htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') : htmlspecialchars(t("product.card.out_of_stock", "Out of Stock"), ENT_QUOTES, 'UTF-8') ?></button>
   </div>
 </div>

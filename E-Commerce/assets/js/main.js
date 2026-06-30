@@ -1039,13 +1039,17 @@ function addToCartWithSelectedSize(triggerEl, id, name, price, imageUrl, seller,
   const picker = host ? host.querySelector(".product-size-picker") : null;
   const sizeSelect = host ? host.querySelector(".product-size-select") : null;
   const sizeHidden = host ? host.querySelector(".product-size-selected") : null;
+  const sizeChips = host ? host.querySelectorAll(".size-chip--pick") : [];
   const selectedChip = host ? host.querySelector(".size-chip--pick.is-selected") : null;
   const selectedSize = sizeSelect
     ? String(sizeSelect.value || "").trim()
-    : (sizeHidden ? String(sizeHidden.value || "").trim() : (selectedChip ? String(selectedChip.dataset.size || "").trim() : ""));
-  if ((sizeSelect || sizeHidden || selectedChip) && !selectedSize) {
+    : (sizeHidden ? String(sizeHidden.value || "").trim() : (selectedChip ? String(selectedChip.dataset.size || selectedChip.textContent || "").trim() : ""));
+  const requiresSize = sizeChips.length > 0 || !!sizeSelect;
+  if (requiresSize && !selectedSize) {
     if (picker) picker.classList.add("is-open");
     if (sizeSelect) sizeSelect.focus();
+    sizeChips.forEach((chip) => chip.classList.add("size-chip--pulse"));
+    showCartToast(mainText("product.select_size_first", "Please select a size first", "Lütfen önce beden seçin"));
     return;
   }
   addToCart(id, name, price, imageUrl, seller, shipping, extra, saving, selectedSize);
@@ -1099,7 +1103,7 @@ function addToCart(id, name, price, imageUrl, seller, shipping, extra, saving, s
   showAddToCartFeedback(name || "Product");
 }
 
-function showAddToCartFeedback(name) {
+function showCartToast(message) {
   let toast = document.getElementById("cartToast");
   if (!toast) {
     toast = document.createElement("div");
@@ -1107,14 +1111,17 @@ function showAddToCartFeedback(name) {
     toast.className = "cart-toast";
     document.body.appendChild(toast);
   }
-  toast.textContent = formatMainTemplate(
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showCartToast._timer);
+  showCartToast._timer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+function showAddToCartFeedback(name) {
+  showCartToast(formatMainTemplate(
     mainText("cart.added_to_cart", "{name} added to cart", "{name} sepete eklendi"),
     { name: name || mainText("product.card.fallback_name", "Product", "Ürün") }
-  );
-  toast.classList.add("show");
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 1300);
+  ));
 
   const cartEl = document.getElementById("cart");
   if (cartEl) {

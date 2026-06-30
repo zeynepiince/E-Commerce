@@ -180,6 +180,11 @@ window.addEventListener("load", function () {
       stockQuantity: <?= (int) ($product['stock_quantity'] ?? 0) ?>
     });
   }
+
+  const firstSizeChip = document.querySelector(".product-detail-info .size-chip--pick");
+  if (firstSizeChip && typeof selectProductSize === "function") {
+    selectProductSize(firstSizeChip, String(firstSizeChip.textContent || "").trim());
+  }
 });
 </script>
 <?php endif; ?>

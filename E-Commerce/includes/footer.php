@@ -282,6 +282,7 @@ window.MAIN_I18N = <?= json_encode([
     'product.card.fallback_name' => t('product.card.fallback_name', 'Product'),
     'product.card.add_to_cart' => t('product.card.add_to_cart', 'Add to Cart'),
     'product.out_of_stock' => t('product.out_of_stock', 'Out of Stock'),
+    'product.select_size_first' => t('product.select_size_first', 'Please select a size first'),
     'cart.remove' => t('cart.remove', 'Remove'),
     'cart.you_save' => t('cart.you_save', 'You save ${amount}'),
     'cart.added_to_cart' => t('cart.added_to_cart', '{name} added to cart'),
