@@ -59,6 +59,14 @@ if ($selectedCategory !== '' && $selectedSubCategory === '') {
         foreach ($navSubs as $sub) {
             $params[] = strtolower($sub);
         }
+        if ($catSlug === 'men') {
+            $aliases = db_category_aliases('men');
+            $catPlaceholders = implode(',', array_fill(0, count($aliases), '?'));
+            $sql .= " AND LOWER(c.category_name) IN ($catPlaceholders)";
+            foreach ($aliases as $a) {
+                $params[] = strtolower($a);
+            }
+        }
     } else {
         $aliases = db_category_aliases($catSlug);
         $placeholders = implode(',', array_fill(0, count($aliases), '?'));

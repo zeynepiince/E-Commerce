@@ -67,7 +67,7 @@ function infer_food_subcategory_from_name(string $nameHay, string $fullHay, bool
         return null;
     }
 
-    if (preg_match('/\b(laptop|macbook|iphone|ipad|airpod|smartphone|tablet|monitor|keyboard|mouse|charger|cable)\b/i', $fullHay)) {
+    if (preg_match('/\b(laptop|macbook|iphone|ipad|airpod|apple watch|smartphone|tablet|monitor|keyboard|mouse|charger|cable)\b/i', $fullHay)) {
         return null;
     }
 
@@ -81,10 +81,11 @@ function infer_food_subcategory_from_name(string $nameHay, string $fullHay, bool
         'broccoli', 'garlic', 'ginger', 'avocado', 'banana', 'strawberry', 'kiwi', 'mulberry', 'lemon',
         'rice', 'pasta', 'flour', 'sugar', 'bread', 'cheese', 'butter', 'yogurt',
         'nuts', 'almond', 'walnut', 'hazelnut', 'chips', 'cracker', 'popcorn', 'cereal', 'oats',
+        'chicken', 'turkey', 'beef', 'pork', 'meat', 'fish', 'salmon', 'shrimp', 'egg',
     ];
-    $ambiguousSnackSignals = ['pepper', 'egg', 'apple', 'orange', 'grape', 'fruit', 'vegetable', 'produce', 'grocery'];
     $gourmetSignals = [
-        'chocolate', 'honey', 'jam', 'olive oil', 'truffle', 'protein powder', 'gourmet',
+        'chocolate', 'honey', 'jam', 'olive oil', 'cooking oil', 'vegetable oil', 'sunflower oil',
+        'truffle', 'protein powder', 'gourmet', 'vinegar', 'spice', 'seasoning',
     ];
 
     foreach ($beverageSignals as $signal) {
@@ -102,6 +103,7 @@ function infer_food_subcategory_from_name(string $nameHay, string $fullHay, bool
             return 'snacks';
         }
     }
+    $ambiguousSnackSignals = ['pepper', 'apple', 'orange', 'grape', 'fruit', 'vegetable', 'produce', 'grocery'];
     if ($allowAmbiguous) {
         foreach ($ambiguousSnackSignals as $signal) {
             if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
@@ -111,6 +113,43 @@ function infer_food_subcategory_from_name(string $nameHay, string $fullHay, bool
     }
 
     return null;
+}
+
+/**
+ * Erkek giyim dışı ürünlerin men/shirt vb. ile eşleşmesini engeller.
+ */
+function is_likely_mens_apparel(string $nameHay, string $fullHay, string $categorySlug = ''): bool
+{
+    if (infer_food_subcategory_from_name($nameHay, $fullHay, true) !== null) {
+        return false;
+    }
+
+    if (preg_match('/\b(dress|frock|gown|skirt|blouse|women|womens|ladies)\b/i', $fullHay)) {
+        return false;
+    }
+
+    if ($categorySlug === 'men') {
+        return (bool) preg_match(
+            '/\b(shirt|tshirt|t-shirt|tee|polo|henley|pant|jean|trouser|jacket|coat|blazer|hoodie|sneaker|oxford|loafer|tie|belt|cap|hat|shorts|jogger|chino|bomber|parka|sweatshirt)\b/i',
+            $fullHay
+        ) || preg_match('/\b(men|mens|men\'s|man\'s)\b/i', $fullHay);
+    }
+
+    return (bool) preg_match(
+        '/\b(men|mens|men\'s|man\'s|boy\'s|boys|male|oxford|loafer|chino|blazer|henley|dress shirt|polo shirt|sneaker|jacket|hoodie|trouser|jeans|joggers)\b/i',
+        $fullHay
+    );
+}
+
+function accept_mens_subcategory_match(?string $sub, string $nameHay, string $fullHay, string $categorySlug): ?string
+{
+    if ($sub === null || $sub === '') {
+        return null;
+    }
+    if (!is_likely_mens_apparel($nameHay, $fullHay, $categorySlug)) {
+        return null;
+    }
+    return $sub;
 }
 
 /**
@@ -218,7 +257,7 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
     }
 
     $groceryCats = ['home', 'food', 'groceries', 'grocery', ''];
-    $foodHit = infer_food_subcategory_from_name($nameHay, $fullHay, in_array($cat, $groceryCats, true));
+    $foodHit = infer_food_subcategory_from_name($nameHay, $fullHay, true);
     if ($foodHit !== null) {
         return $foodHit;
     }
@@ -230,7 +269,7 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
             'bags'               => ['bag', 'backpack', 'purse', 'satchel', 'duffel', 'luggage'],
             'dress'              => ['dress', 'gown', 'sundress', 'frock', 'maxi', 'suit'],
             'blouse'             => ['blouse', 'tank top', 'crop top', 'camisole', 'tunic'],
-            'shirt'              => ['shirt', 'tshirt', 't-shirt', 'tee', 'polo', 'top'],
+            'women-tops'         => ['shirt', 'tshirt', 't-shirt', 'tee', 'polo', 'top'],
             'skirts'             => ['skirt', 'corset'],
         ],
         'men' => [
@@ -359,10 +398,16 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
 
     if ($cat !== '' && isset($rules[$cat])) {
         $hit = $tryMatch($rules[$cat], $nameHay);
+        if ($cat === 'men') {
+            $hit = accept_mens_subcategory_match($hit, $nameHay, $fullHay, $cat);
+        }
         if ($hit !== null) {
             return $hit;
         }
         $hit = $tryMatch($rules[$cat], $fullHay);
+        if ($cat === 'men') {
+            $hit = accept_mens_subcategory_match($hit, $nameHay, $fullHay, $cat);
+        }
         if ($hit !== null) {
             return $hit;
         }
@@ -370,7 +415,7 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
 
     // Ürün adı önce; kitap anahtar kelimeleri (history vb.) açıklamada yanlış eşleşmesin diye books en sonda.
     $crossParentOrder = [
-        'food', 'jewelry', 'electronics', 'beauty', 'men', 'women', 'pet',
+        'food', 'jewelry', 'electronics', 'beauty', 'women', 'men', 'pet',
         'sports', 'gadgets', 'kids', 'toys', 'auto', 'office', 'garden', 'health', 'baby', 'arts', 'home', 'books',
     ];
     if ($cat !== '' && isset($rules[$cat])) {
@@ -382,6 +427,9 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
             continue;
         }
         $hit = $tryMatch($rules[$parent], $nameHay);
+        if ($parent === 'men') {
+            $hit = accept_mens_subcategory_match($hit, $nameHay, $fullHay, $cat);
+        }
         if ($hit !== null) {
             return $hit;
         }
@@ -392,6 +440,9 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
             continue;
         }
         $hit = $tryMatch($rules[$parent], $fullHay);
+        if ($parent === 'men') {
+            $hit = accept_mens_subcategory_match($hit, $nameHay, $fullHay, $cat);
+        }
         if ($hit !== null) {
             return $hit;
         }

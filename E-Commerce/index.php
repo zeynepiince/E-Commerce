@@ -85,7 +85,7 @@ $selectedCategory = $_GET['category'] ?? '';
   <nav class="categories-nav" id="categoriesNav">
     <?php
     $defaultSubCategories = [
-        'women' => ['dress','blouse','skirts','women-accessories','women-shoes','bags'],
+        'women' => ['dress','blouse','skirts','women-tops','women-accessories','women-shoes','bags'],
         'men' => ['shirt','pants','jacket','men-shoes','men-accessories'],
         'electronics' => ['computer-tablet','printer','phone','tv','speakers','camera'],
         'home' => ['furniture','decor','kitchen','bedding'],

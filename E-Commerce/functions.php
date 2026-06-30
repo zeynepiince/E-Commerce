@@ -394,7 +394,7 @@ function catalog_subcategory_parent_map(): array
 {
     return [
         'women-shoes' => 'women', 'women-accessories' => 'women', 'bags' => 'women',
-        'dress' => 'women', 'blouse' => 'women', 'skirts' => 'women',
+        'dress' => 'women', 'blouse' => 'women', 'skirts' => 'women', 'women-tops' => 'women',
         'men-shoes' => 'men', 'men-accessories' => 'men', 'shirt' => 'men',
         'pants' => 'men', 'jacket' => 'men',
         'phone' => 'electronics', 'computer-tablet' => 'electronics', 'smart-home' => 'electronics',
@@ -426,6 +426,17 @@ function catalog_nav_slug_for_subcategory(?string $subCategory): ?string
     }
     $map = catalog_subcategory_parent_map();
     return $map[$sub] ?? null;
+}
+
+/** @return string[] */
+function catalog_men_subcategories(): array
+{
+    return catalog_subcategories_for_nav_slug('men');
+}
+
+function is_mens_apparel_subcategory(?string $subCategory): bool
+{
+    return in_array(strtolower(trim((string) $subCategory)), catalog_men_subcategories(), true);
 }
 
 /** @return string[] */
@@ -519,6 +530,7 @@ function localized_category_label(?string $raw): string
         "sneaker" => "Sneaker",
         "dress" => "Elbise",
         "blouse" => "Bluz",
+        "women tops" => "Üst Giyim",
         "skirts" => "Etek",
         "women accessories" => "Kadın Aksesuarları",
         "women shoes" => "Kadın Ayakkabıları",

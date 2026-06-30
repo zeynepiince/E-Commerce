@@ -54,4 +54,27 @@ WHERE LOWER(sub_category) IN ('running', 'cycling', 'fitness', 'outdoor', 'kids-
 UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'electronics' LIMIT 1)
 WHERE LOWER(sub_category) IN ('smartwatch', 'headphones', 'gadgets-accessories');
 
+-- Women's tops wrongly stored as men's sub_category "shirt".
+UPDATE products SET sub_category = 'women-tops', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'women''s clothing' LIMIT 1)
+WHERE sub_category = 'shirt'
+AND (
+    LOWER(name) LIKE '%women%' OR LOWER(name) LIKE '%womens%' OR LOWER(name) LIKE '%ladies%'
+    OR LOWER(name) LIKE '%dress%' OR LOWER(name) LIKE '%blouse%' OR LOWER(name) LIKE '%skirt%'
+    OR category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'women''s clothing' LIMIT 1)
+);
+
+-- Non-apparel products wrongly under Men's clothing.
+UPDATE products SET sub_category = 'snacks', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
+WHERE category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'men''s clothing' LIMIT 1)
+AND LOWER(name) REGEXP '(chicken|turkey|beef|pork|meat|fish|salmon|shrimp|apple|potato|onion|cucumber|tomato|carrot|rice|pasta|bread|cheese|egg|milk|cola|coke|pepsi|juice|soda|snack|cereal|banana|strawberry|kiwi|lemon|mulberry|flour|sugar|nuts|popcorn)';
+
+UPDATE products SET sub_category = 'gourmet', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
+WHERE category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'men''s clothing' LIMIT 1)
+AND LOWER(name) REGEXP '(cooking oil|olive oil|vegetable oil|sunflower oil|vinegar|honey|jam|chocolate|spice|seasoning)';
+
+UPDATE products SET sub_category = 'dress', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'women''s clothing' LIMIT 1)
+WHERE category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'men''s clothing' LIMIT 1)
+AND (LOWER(name) LIKE '%dress%' OR LOWER(name) LIKE '%frock%' OR LOWER(name) LIKE '%gown%' OR LOWER(name) LIKE '%skirt%')
+AND LOWER(name) NOT LIKE '%dress shirt%';
+
 -- Full reclassification: import_products.php?backfill_subcat=1&force=1
