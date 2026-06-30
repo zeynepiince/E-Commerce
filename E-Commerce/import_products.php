@@ -104,7 +104,7 @@ function infer_category_id(PDO $pdo, ?string $subCategory, ?string $apiCategory 
         'garden'      => 'Home',
         'health'      => 'Home',
         'baby'        => 'Home',
-        'food'        => 'Home',
+        'food'        => 'Food',
         'arts'        => 'Home',
     ];
 

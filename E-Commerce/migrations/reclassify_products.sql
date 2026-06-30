@@ -26,3 +26,11 @@ WHERE (
     OR LOWER(description) LIKE '%playful%dress%'
 )
 AND category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'men''s clothing' LIMIT 1);
+
+-- Food category + move groceries out of Home.
+INSERT INTO categories (category_name)
+SELECT 'Food' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1);
+
+UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
+WHERE LOWER(COALESCE(sub_category, '')) IN ('snacks', 'beverages', 'gourmet');

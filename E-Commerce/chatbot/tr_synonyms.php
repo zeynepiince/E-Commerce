@@ -371,7 +371,9 @@ function normalize_turkish_shopping_query(string $rawMessage): string
 function turkish_product_topic_rules(): array
 {
     return [
-        ['pattern' => '/\b(mutfak\s+eşya\w*|mutfak\s+malzemeler\w*|mutfak\s+alet\w*|mutfak\s+ürün\w*|mutfak\s+urun\w*|pişirme\s+malzemeler\w*|pisirme\s+malzemeler\w*)\b/ui', 'category_like' => 'kitchen', 'product_type' => 'kitchen', 'keywords' => ['kitchen', 'cookware']],
+        ['pattern' => '/\b(cook(?:ing)?\s+(?:for\s+)?(?:dinner|lunch|breakfast|a\s+meal|tonight|today)|(?:want|need)\s+to\s+cook|(?:make|prepare|plan)\s+(?:dinner|lunch|breakfast|a\s+meal|food)|(?:dinner|lunch|breakfast|meal)\s+(?:ingredients|shopping|groceries)|akşam\s+yemeği|aksam\s+yemegi|yemek\s+yap|market\s+alışveriş)\b/ui', 'category_like' => 'food', 'product_type' => 'snacks'],
+        ['pattern' => '/\b(mutfak\s+eşya\w*|mutfak\s+alet\w*|mutfak\s+ürün\w*|mutfak\s+urun\w*)\b/ui', 'category_like' => 'kitchen', 'product_type' => 'kitchen', 'keywords' => ['kitchen', 'cookware']],
+        ['pattern' => '/\b(pişirme\s+malzemeler\w*|pisirme\s+malzemeler\w*)\b/ui', 'category_like' => 'kitchen', 'product_type' => 'kitchen', 'keywords' => ['kitchen', 'cookware']],
         ['pattern' => '/\b(mutfak|tencere|tava|wok|blender|tost\s+makinesi|mikser|rende|süzgeç|suzgec|kepçe|spatula|çaydanlık|caydanlik|demlik|fincan|bardak|tabak|çatal|catal|kaşık|kasik|bıçak|bicak|tupperware|saklama\s+kap\w*)\b/ui', 'category_like' => 'kitchen', 'product_type' => 'kitchen', 'keywords' => ['kitchen']],
         ['pattern' => '/\b(ev\s+eşya\w*|ev\s+esya\w*|ev\s+dekor\w*|ev\s+tekstil\w*)\b/ui', 'category_like' => 'home', 'product_type' => 'furniture', 'keywords' => ['home', 'furniture']],
         ['pattern' => '/\b(mobilya|koltuk|kanepe|sehpa|masa|sandalye|dolap|gardırop|gardirob|komodin|kitaplık|kitaplik|yatak|yatak\s+odası|yatak\s+odasi|nevresim|yorgan|battaniye|yastık|yastik|halı|hali|kilim|perde|avize|lamba|ayna|vazo)\b/ui', 'category_like' => 'home', 'product_type' => 'furniture', 'keywords' => ['furniture', 'decor', 'bedding']],
@@ -513,7 +515,63 @@ function turkish_search_stop_words(): array
         'product', 'products',
         'order', 'orders', 'ordering', 'sipariş', 'siparis', 'siparişi', 'siparisi',
         'best', 'seller', 'sellers', 'selling', 'popular', 'satan', 'satanlar', 'satanları',
+        'cook', 'cooking', 'cooked', 'dinner', 'lunch', 'breakfast', 'meal', 'meals', 'tonight',
+        'prepare', 'yemek', 'akşam', 'aksam', 'yemeği', 'yemegi', 'pişir', 'pisir',
     ];
+}
+
+function is_meal_cooking_shopping_query(string $message): bool
+{
+    $text = to_lower(trim($message));
+    if ($text === '') {
+        return false;
+    }
+
+    return (bool) preg_match(
+        '/\b(?:'
+        . 'cook(?:ing)?\s+(?:for\s+)?(?:dinner|lunch|breakfast|a\s+meal|tonight|today)'
+        . '|(?:want|need)\s+to\s+cook'
+        . '|(?:make|prepare|plan)\s+(?:dinner|lunch|breakfast|a\s+meal|food|something\s+to\s+eat)'
+        . '|(?:dinner|lunch|breakfast|meal)\s+(?:ingredients|shopping|groceries|ideas)'
+        . '|(?:what\s+(?:do\s+i\s+need|should\s+i\s+buy)\s+(?:for\s+)?(?:dinner|cooking|a\s+meal))'
+        . '|(?:akşam|aksam)\s+yemeği'
+        . '|yemek\s+yap'
+        . '|pişir(?:eceğim|ecegim|mek\s+istiyorum|mek\s+lazim|iyorum)'
+        . '|market\s+alışveriş'
+        . '|grocery\s+shopping'
+        . ')\b/ui',
+        $text
+    );
+}
+
+/**
+ * "Cook for dinner" gibi niyet cümlelerinde "cook" → "cooking oil" yanlış eşleşmesini önler.
+ *
+ * @param array<string, mixed> $entities
+ * @return array<string, mixed>
+ */
+function apply_meal_cooking_entities(array $entities, string $rawMessage): array
+{
+    if (!is_meal_cooking_shopping_query($rawMessage)) {
+        return $entities;
+    }
+
+    $entities['_meal_cooking_search'] = true;
+    $entities['category_like'] = 'food';
+    $entities['product_type'] = 'snacks';
+
+    $noise = [
+        'cook', 'cooking', 'cooked', 'dinner', 'lunches', 'lunch', 'breakfast', 'meal', 'meals',
+        'tonight', 'today', 'want', 'prepare', 'make', 'plan', 'food', 'for', 'something', 'eat',
+        'ingredients', 'shopping', 'groceries', 'ideas', 'need', 'buy',
+    ];
+    $keywords = is_array($entities['keywords'] ?? null) ? $entities['keywords'] : [];
+    $entities['keywords'] = array_values(array_filter($keywords, static function ($kw) use ($noise): bool {
+        $lower = to_lower(trim((string) $kw));
+        return $lower !== '' && !in_array($lower, $noise, true);
+    }));
+
+    return $entities;
 }
 
 function turkish_footwear_terms(): array

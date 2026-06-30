@@ -278,6 +278,7 @@ function detect_intent(string $message): string
     if (is_order_tracking_intent($message)) return "order_status";
     if (preg_match('/\b(cart|basket|sepet\w*)\b/ui', $message)) return "cart_question";
     if (is_best_sellers_request($message)) return "product_search";
+    if (is_meal_cooking_shopping_query($message)) return "product_search";
     if (preg_match('/\b(recommend|suggest|need|looking\s+for|find|show|öner|oner|göster|goster|bul|ara|almak\s+istiyorum|satın\s+al|satin\s+al|arıyorum|ariyorum|bakıyorum|bakiyorum)\b/ui', $message)) {
         return "product_search";
     }
@@ -440,6 +441,8 @@ function extract_entities(string $rawMessage): array
         $out["category_like"] = null;
         $out["product_type"] = null;
     }
+
+    $out = apply_meal_cooking_entities($out, $rawMessage);
 
     return $out;
 }

@@ -386,6 +386,17 @@ function normalize_category_slug(?string $raw): string
     return $map[$v] ?? $v;
 }
 
+/** Grocery / food catalog sub-categories (site slug: food). */
+function food_grocery_subcategories(): array
+{
+    return ['snacks', 'beverages', 'gourmet'];
+}
+
+function is_food_grocery_subcategory(?string $subCategory): bool
+{
+    return in_array(strtolower(trim((string) $subCategory)), food_grocery_subcategories(), true);
+}
+
 /**
  * Slug'tan ("women", "jewelry") DB'de gerçekten depolanmış olabilecek
  * alternatif kategori adlarını döner. SQL filter'da
@@ -399,6 +410,7 @@ function db_category_aliases(string $slug): array
         "women"   => ["women", "women's clothing", "womens clothing"],
         "men"     => ["men", "men's clothing", "mens clothing"],
         "jewelry" => ["jewelry", "jewelery", "jewellery"],
+        "food"    => ["food", "home"],
     ];
     return $reverse[$slug] ?? [$slug];
 }

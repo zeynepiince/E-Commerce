@@ -52,6 +52,13 @@ function append_clothing_type_guard(string &$sql, array &$params, array $entitie
     }
 }
 
+function append_meal_cooking_grocery_guard(string &$sql): void
+{
+    $sql .= " AND LOWER(COALESCE(p.sub_category, '')) IN ('snacks', 'gourmet', 'beverages')";
+    $sql .= " AND LOWER(p.name) NOT LIKE '%cooking oil%'";
+    $sql .= " AND LOWER(p.name) NOT LIKE '%olive oil%'";
+}
+
 function append_footwear_name_guard(string &$sql, array &$params, string $mode = 'default'): void
 {
     if ($mode === 'budget') {
@@ -560,6 +567,10 @@ function search_products_advanced(PDO $pdo, array $entities, int $limit = 4, int
             $params[] = $like;
         }
         $sql .= " AND (" . implode(" OR ", $catParts) . ")";
+    }
+
+    if (!empty($entities['_meal_cooking_search'])) {
+        append_meal_cooking_grocery_guard($sql);
     }
 
     if (is_footwear_product_search($entities)) {

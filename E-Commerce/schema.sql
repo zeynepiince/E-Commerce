@@ -50,7 +50,8 @@ INSERT INTO categories (category_id, category_name) VALUES
   (3, 'Home'),
   (4, 'men''s clothing'),
   (5, 'jewelery'),
-  (6, 'women''s clothing')
+  (6, 'women''s clothing'),
+  (7, 'Food')
 ON DUPLICATE KEY UPDATE category_name = VALUES(category_name);
 
 -- ---------------------------------------------------------------------------

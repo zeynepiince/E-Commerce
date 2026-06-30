@@ -67,6 +67,11 @@ function build_product_reply_intro(array $entities, string $lang = "en"): string
             ? "En çok satan ürünler:"
             : "Best sellers:";
     }
+    if (!empty($entities["_meal_cooking_search"])) {
+        return $lang === "tr"
+            ? "Akşam yemeği için marketten alabileceğin ürünler:"
+            : "Here are grocery items you can use for dinner:";
+    }
     $fallback = (string) ($entities["_audience_fallback"] ?? "");
     if ($fallback === "women_shirt") {
         return $lang === "tr"

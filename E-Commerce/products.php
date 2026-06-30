@@ -49,14 +49,25 @@ $sql = "
 $params = [];
 
 if ($selectedCategory !== '') {
-    // Kullanıcı 'women' slug'ını seçtiyse DB'deki tüm alias adları
-    // ("women's clothing", "Women", ...) ile eşleştir.
     $catSlug = normalize_category_slug($selectedCategory);
-    $aliases = db_category_aliases($catSlug);
-    $placeholders = implode(',', array_fill(0, count($aliases), '?'));
-    $sql .= " AND LOWER(c.category_name) IN ($placeholders)";
-    foreach ($aliases as $a) {
-        $params[] = strtolower($a);
+    if ($catSlug === 'food') {
+        if ($selectedSubCategory === '') {
+            $foodSubs = function_exists('food_grocery_subcategories')
+                ? food_grocery_subcategories()
+                : ['snacks', 'beverages', 'gourmet'];
+            $placeholders = implode(',', array_fill(0, count($foodSubs), '?'));
+            $sql .= " AND LOWER(p.sub_category) IN ($placeholders)";
+            foreach ($foodSubs as $sub) {
+                $params[] = strtolower($sub);
+            }
+        }
+    } else {
+        $aliases = db_category_aliases($catSlug);
+        $placeholders = implode(',', array_fill(0, count($aliases), '?'));
+        $sql .= " AND LOWER(c.category_name) IN ($placeholders)";
+        foreach ($aliases as $a) {
+            $params[] = strtolower($a);
+        }
     }
 }
 if ($selectedSubCategory !== '') {

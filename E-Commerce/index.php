@@ -124,8 +124,12 @@ $selectedCategory = $_GET['category'] ?? '';
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             // DB'deki kategori adını ("women's clothing", "Jewelery"...) site slug'ına
             // ("women", "jewelry") indir; aynı kategori ayrı satırlarda görünmesin.
-            $cat = normalize_category_slug($row['category_name'] ?? '');
             $sub = strtolower(trim($row['sub_category'] ?? ''));
+            if (function_exists('is_food_grocery_subcategory') && is_food_grocery_subcategory($sub)) {
+                $cat = 'food';
+            } else {
+                $cat = normalize_category_slug($row['category_name'] ?? '');
+            }
 
             if ($cat === '') {
                 continue;
