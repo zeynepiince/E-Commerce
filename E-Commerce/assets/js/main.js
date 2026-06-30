@@ -280,6 +280,25 @@ function zeraInitApp() {
 if (!window.__ZERA_CLICK_BOUND) {
   window.__ZERA_CLICK_BOUND = true;
   document.addEventListener("click", (e) => {
+    const addBtn = e.target.closest(".product-card-add, .home-product-add, .product-detail-add, .chat-product-card-add");
+    if (addBtn && !addBtn.disabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = parseInt(addBtn.dataset.id || "0", 10);
+      if (!id) return;
+      const name = addBtn.dataset.name || addBtn.getAttribute("data-name") || "Product";
+      const price = parseFloat(addBtn.dataset.price || "0");
+      const image = addBtn.dataset.image || "";
+      if (addBtn.dataset.addToCartWithSize === "1") {
+        if (typeof addToCartWithSelectedSize === "function") {
+          addToCartWithSelectedSize(addBtn, id, name, Number.isFinite(price) ? price : 0, image);
+        }
+      } else if (typeof addToCart === "function") {
+        addToCart(id, name, Number.isFinite(price) ? price : 0, image);
+      }
+      return;
+    }
+
     const btn = e.target.closest(".wishlist-btn");
     if (!btn) return;
     e.preventDefault();
@@ -592,6 +611,8 @@ function renderRecentlyViewed() {
 
   recentlyViewed.forEach((p, idx) => {
     const safeImage = p.imageUrl || "https://images.unsplash.com/photo-1542291026-7eec264c27ff";
+    const rawName = p.name || mainText("product.card.fallback_name", "Product", "Ürün");
+    const safeName = String(rawName).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
     const priceDisplay = typeof p.price === "number" ? `$${p.price}` : "";
     const id = p.id;
     const stockQuantity =
@@ -604,21 +625,24 @@ function renderRecentlyViewed() {
         type="button"
         class="wishlist-btn ${isFavorite(id) ? "wishlist-btn--active" : ""}"
         data-id="${id}"
-        onclick="toggleFavorite(${id}, '${(p.name || "").replace(/'/g, "\\'")}', '${safeImage}')"
+        data-name="${safeName}"
+        data-image="${safeImage.replace(/"/g, "&quot;")}"
+        data-price="${typeof p.price === "number" ? p.price : ""}"
+        data-stock="${stockQuantity}"
       >
         ${isFavorite(id) ? "♥" : "♡"}
       </button>
-      <img src="${safeImage}" alt="${p.name || mainText("product.card.fallback_name", "Product", "Ürün")}">
-      <h4>${p.name || mainText("product.card.fallback_name", "Product", "Ürün")}</h4>
+      <img src="${safeImage}" alt="${safeName}">
+      <h4>${safeName}</h4>
       ${priceDisplay ? `<p class="price">${priceDisplay}</p>` : ""}
       <button
+        type="button"
         ${inStock ? "" : "disabled"}
-        class="${inStock ? "" : "product-card-add--disabled"}"
-        onclick="${
-          inStock
-            ? `addToCart(${id}, '${(p.name || "").replace(/'/g, "\\'")}', ${p.price || 0}, '${safeImage}')`
-            : "return false;"
-        }"
+        class="product-card-add ${inStock ? "" : "product-card-add--disabled"}"
+        data-id="${id}"
+        data-name="${safeName}"
+        data-price="${typeof p.price === "number" ? p.price : 0}"
+        data-image="${safeImage.replace(/"/g, "&quot;")}"
       >
         ${inStock ? mainText("product.card.add_to_cart", "Add to Cart", "Sepete Ekle") : mainText("product.out_of_stock", "Out of Stock", "Stokta Yok")}
       </button>
@@ -1283,19 +1307,21 @@ function sendChatMessage(message, quickActionKey) {
         wrap.style.marginTop = "8px";
         wrap.innerHTML = suggested.map((p) => {
           const id = Number(p.product_id || 0);
-          const name = String(p.name || "Product").replace(/'/g, "\\'");
-          const image = String(p.image_url || "https://images.unsplash.com/photo-1542291026-7eec264c27ff").replace(/'/g, "\\'");
+          const rawName = String(p.name || "Product");
+          const safeName = rawName.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+          const rawImage = String(p.image_url || "https://images.unsplash.com/photo-1542291026-7eec264c27ff");
+          const safeImage = rawImage.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
           const price = Number(p.price || 0);
           return `
             <div class="chat-product-card">
-              <img src="${image}" alt="${name}" class="chat-product-card-image">
+              <img src="${safeImage}" alt="${safeName}" class="chat-product-card-image">
               <div style="flex:1;min-width:0;">
-                <div class="chat-product-card-title">${name}</div>
+                <div class="chat-product-card-title">${safeName}</div>
                 <div class="chat-product-card-price">$${price.toFixed(2)}</div>
                 <div class="chat-product-card-meta">${defaultSeller()} · ${defaultShipping()}</div>
               </div>
-              <a href="product_detail.php?name=${encodeURIComponent(name)}" class="chat-product-card-view">${mainText("chat.product_view", "View", "Gör")}</a>
-              <button class="chat-product-card-add" onclick="addToCart(${id}, '${name}', ${price}, '${image}')">${mainText("chat.product_add", "Add", "Ekle")}</button>
+              <a href="product_detail.php?name=${encodeURIComponent(rawName)}" class="chat-product-card-view">${mainText("chat.product_view", "View", "Gör")}</a>
+              <button type="button" class="chat-product-card-add" data-id="${id}" data-name="${safeName}" data-price="${price}" data-image="${safeImage}">${mainText("chat.product_add", "Add", "Ekle")}</button>
             </div>
           `;
         }).join("");

@@ -110,16 +110,15 @@ $page_title = $product ? ($product['name'] . " – ZERA") : t("meta.product_deta
         </div>
         <div style="max-width:260px;">
         <button
-          class="btn-full-width"
+          type="button"
+          class="btn-full-width product-detail-add"
           style="max-width:260px;"
           <?= !$inStock ? 'disabled' : '' ?>
-          onclick="<?= $inStock ? "addToCartWithSelectedSize(
-            this,
-            " . (int)$cartId . ",
-            " . htmlspecialchars(json_encode($product['name']), ENT_QUOTES, 'UTF-8') . ",
-            " . (float)$product['price'] . ",
-            " . htmlspecialchars(json_encode($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff'), ENT_QUOTES, 'UTF-8') . "
-          )" : "return false;" ?>"
+          data-add-to-cart-with-size="1"
+          data-id="<?= (int) $cartId ?>"
+          data-name="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>"
+          data-price="<?= htmlspecialchars((string) ((float) $product['price']), ENT_QUOTES, 'UTF-8') ?>"
+          data-image="<?= htmlspecialchars($product['image_url'] ?: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff', ENT_QUOTES, 'UTF-8') ?>"
         >
            <?= $inStock ? htmlspecialchars(t("product_detail.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') : 'Out of Stock' ?>
         </button>

@@ -107,15 +107,10 @@ if (isset($badges) && is_array($badges)) {
       type="button"
       class="product-card-add <?= !$inStock ? 'product-card-add--disabled' : '' ?>"
       <?= !$inStock ? 'disabled' : '' ?>
-      onclick='<?= $inStock
-        ? "addToCart(" .
-            $productId . ", " .
-            json_encode($productName) . ", " .
-            $productPrice . ", " .
-            json_encode($imageUrl) .
-          ")"
-        : "return false;"
-      ?>'
+      data-id="<?= $productId ?>"
+      data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>"
+      data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>"
+      data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>"
     >
       <?= $inStock
         ? htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8')

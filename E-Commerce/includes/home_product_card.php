@@ -40,6 +40,6 @@ $reviewCount = $reviewCount ?? rand(12, 340);
     <?php if (!empty($sizeList)): ?>
       <p class="home-product-reviews"><?= htmlspecialchars(t("product.card.size", "Size"), ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars(implode(" · ", $sizeList), ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
-    <button type="button" class="home-product-add <?= !$inStock ? 'product-card-add--disabled' : '' ?>" <?= !$inStock ? 'disabled' : '' ?> onclick='<?= $inStock ? "addToCart(" . $productId . ", " . json_encode($productName) . ", " . $productPrice . ", " . json_encode($imageUrl) . ")" : "return false;" ?>'><?= $inStock ? htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') : htmlspecialchars(t("product.card.out_of_stock", "Out of Stock"), ENT_QUOTES, 'UTF-8') ?></button>
+    <button type="button" class="home-product-add <?= !$inStock ? 'product-card-add--disabled' : '' ?>" <?= !$inStock ? 'disabled' : '' ?> data-id="<?= $productId ?>" data-name="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>" data-price="<?= htmlspecialchars((string) $productPrice, ENT_QUOTES, 'UTF-8') ?>" data-image="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $inStock ? htmlspecialchars(t("product.card.add_to_cart", "Add to Cart"), ENT_QUOTES, 'UTF-8') : htmlspecialchars(t("product.card.out_of_stock", "Out of Stock"), ENT_QUOTES, 'UTF-8') ?></button>
   </div>
 </div>
