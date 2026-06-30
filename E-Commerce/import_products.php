@@ -256,7 +256,6 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
         return $womenOverride;
     }
 
-    $groceryCats = ['home', 'food', 'groceries', 'grocery', ''];
     $foodHit = infer_food_subcategory_from_name($nameHay, $fullHay, true);
     if ($foodHit !== null) {
         return $foodHit;
