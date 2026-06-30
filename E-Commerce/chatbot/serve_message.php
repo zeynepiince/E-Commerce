@@ -38,10 +38,6 @@ if ($lang !== 'en' && $lang !== 'tr') {
 $policyKnowledge = load_policy_knowledge();
 $entities = extract_entities($rawMessage);
 
-if ($quickAction === 'recommend_product' || is_generic_product_recommendation_request($rawMessage, $quickAction)) {
-    $entities = reset_entities_for_generic_recommendation($entities);
-}
-
 $memory = $_SESSION['chatbot_memory'] ?? [];
 if (!is_array($memory)) {
     $memory = [];
@@ -57,6 +53,19 @@ $userProfile = $_SESSION['user_profile'] ?? [
 if (!is_array($userProfile)) {
     $userProfile = ['prefers_budget' => false, 'category_interest' => null];
 }
+
+if ($quickAction !== '') {
+    $entities = prepare_entities_for_product_quick_action($entities, $quickAction, $rawMessage);
+} elseif (is_generic_product_recommendation_request($rawMessage, $quickAction)) {
+    $entities = reset_entities_for_generic_recommendation($entities);
+}
+
+if (is_fresh_product_search_quick_action($quickAction) || !empty($entities['_fresh_product_search'])) {
+    [$memory, $userProfile] = reset_chatbot_product_session_context($memory, $userProfile);
+}
+
+$favoriteIdsForChat = parse_favorite_product_ids($data['favorite_ids'] ?? []);
+$memory['_favorite_ids'] = $favoriteIdsForChat;
 
 $lastSuggested = $memory['last_suggested_products'] ?? [];
 $hadProductContext = in_array(($memory['last_intent'] ?? ''), ['product_search', 'product_followup'], true)

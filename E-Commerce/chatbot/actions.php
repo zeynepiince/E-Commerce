@@ -306,11 +306,13 @@ function apply_product_search_session_context(
         return ['entities' => $entities, 'userProfile' => $userProfile];
     }
 
-    if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
+    if (!empty($entities['_generic_recommend'])
+        || !empty($entities['_fresh_product_search'])
+        || is_generic_product_recommendation_request($rawMessage)) {
         return ['entities' => $entities, 'userProfile' => $userProfile];
     }
 
-    $inheritProductContext = should_inherit_product_search_context($entities, $rawMessage)
+    $inheritProductContext = should_inherit_product_search_context($entities, $rawMessage, $memory)
         || !empty($entities['_audience_correction']);
     $memoryEntities = is_array($memory['entities'] ?? null) ? $memory['entities'] : [];
 
@@ -370,16 +372,6 @@ function apply_product_search_session_context(
     if ($inheritProductContext && empty($entities['category_like']) && !empty($userProfile['category_interest'])) {
         $entities['category_like'] = (string) $userProfile['category_interest'];
     }
-    if ($inheritProductContext
-        && $userProfile['prefers_budget'] === true
-        && empty($entities['max_price'])
-        && is_numeric($memory['last_suggested_max_price'] ?? null)) {
-        $entities['max_price'] = round((float) $memory['last_suggested_max_price'] * 0.9, 2);
-        $entities['budget']['max'] = $entities['max_price'];
-        if (empty($entities['sort_by'])) {
-            $entities['sort_by'] = 'price_asc';
-        }
-    }
 
     if ($inheritProductContext && is_cheaper_refinement_message($rawMessage)) {
         $prevMax = is_numeric($entities['max_price'] ?? null) ? (float) $entities['max_price']
@@ -405,9 +397,24 @@ function apply_product_search_session_context(
     return ['entities' => $entities, 'userProfile' => $userProfile];
 }
 
-function should_inherit_product_search_context(array $entities, string $rawMessage): bool
+function should_inherit_product_search_context(array $entities, string $rawMessage, array $memory = []): bool
 {
-    if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
+    if (!empty($entities['_generic_recommend'])
+        || !empty($entities['_fresh_product_search'])
+        || is_generic_product_recommendation_request($rawMessage)) {
+        return false;
+    }
+
+    if (is_best_sellers_request($rawMessage) || !empty($entities['_best_sellers_request'])) {
+        return false;
+    }
+
+    if (message_specifies_budget($rawMessage)) {
+        return false;
+    }
+
+    $memoryEntities = is_array($memory['entities'] ?? null) ? $memory['entities'] : [];
+    if (!empty($memoryEntities['_generic_recommend']) || !empty($memoryEntities['_fresh_product_search'])) {
         return false;
     }
 
@@ -421,6 +428,10 @@ function should_inherit_product_search_context(array $entities, string $rawMessa
 
     if (preg_match('/\b(those|these|olan|olanları|onlari|onları|daha ucuz|cheaper|biraz daha ucuz|ucuz)\b/ui', $rawMessage)) {
         return true;
+    }
+
+    if (is_wireless_refinement_message($rawMessage) && !empty($entities['_wireless_refinement'])) {
+        return false;
     }
 
     if (is_wireless_refinement_message($rawMessage)) {
@@ -439,7 +450,7 @@ function should_inherit_product_search_context(array $entities, string $rawMessa
     }
 
     $keywords = filter_product_search_keywords(is_array($entities['keywords'] ?? null) ? $entities['keywords'] : []);
-    return $keywords === [];
+    return $keywords === [] && is_cheaper_refinement_message($rawMessage);
 }
 
 function filter_product_search_keywords(array $keywords): array
@@ -1295,9 +1306,14 @@ function handle_intent_action(PDO $pdo, string $intent, string $rawMessage, stri
     }
     elseif ($intent === "product_search") {
         if (!empty($entities['_generic_recommend']) || is_generic_product_recommendation_request($rawMessage)) {
-            $suggestedProducts = fetch_top_products($pdo, 4);
+            require_once __DIR__ . '/../recommended.php';
+            $favoriteIds = is_array($memory['_favorite_ids'] ?? null) ? $memory['_favorite_ids'] : [];
+            $suggestedProducts = get_ai_recommendations($pdo, (int) ($userId ?? 0), 4, $favoriteIds);
             if ($suggestedProducts === []) {
                 $suggestedProducts = fetch_best_seller_products($pdo, 4);
+            }
+            if ($suggestedProducts === []) {
+                $suggestedProducts = fetch_top_products($pdo, 4);
             }
             $reply = build_product_reply($suggestedProducts, $entities, $lang);
             $redirectUrl = build_products_redirect_url($entities);

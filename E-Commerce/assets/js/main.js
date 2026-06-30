@@ -1201,7 +1201,8 @@ function sendChatMessage(message, quickActionKey) {
     message: transportMessage || finalMessage,
     quick_action: quickAction,
     cart,
-    page: window.location.pathname
+    page: window.location.pathname,
+    favorite_ids: favorites.map((f) => f.id).filter((id) => Number(id) > 0)
   };
   const typingMsg = document.createElement("div");
   typingMsg.className = "msg bot msg-typing";

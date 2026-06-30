@@ -147,14 +147,119 @@ function message_specifies_budget(string $message): bool
 function reset_entities_for_generic_recommendation(array $entities): array
 {
     $entities['_generic_recommend'] = true;
+    $entities['_fresh_product_search'] = true;
     $entities['max_price'] = null;
     $entities['min_price'] = null;
     $entities['budget'] = ['min' => null, 'max' => null, 'currency' => 'USD'];
     $entities['category_like'] = null;
     $entities['product_type'] = null;
+    $entities['audience'] = null;
+    $entities['color'] = null;
+    $entities['size'] = null;
+    $entities['brand'] = null;
+    $entities['features'] = [];
     $entities['keywords'] = [];
     $entities['sort_by'] = 'featured_price';
-    unset($entities['_cheaper_refinement'], $entities['_best_sellers_request']);
+    unset($entities['_cheaper_refinement'], $entities['_best_sellers_request'], $entities['_wireless_refinement']);
+    return $entities;
+}
+
+function is_fresh_product_search_quick_action(string $quickAction): bool
+{
+    return in_array(strtolower(trim($quickAction)), [
+        'recommend_product',
+        'best_sellers',
+        'under_100',
+        'wireless_only',
+    ], true);
+}
+
+/**
+ * Quick-action chips start a new product query; drop stale budget/category from session.
+ *
+ * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+ */
+function reset_chatbot_product_session_context(array $memory, array $userProfile): array
+{
+    unset($memory['last_suggested_max_price']);
+    $memory['entities'] = [];
+    $userProfile['prefers_budget'] = false;
+    $userProfile['category_interest'] = null;
+
+    return [$memory, $userProfile];
+}
+
+/**
+ * @param array<string, mixed> $entities
+ * @return array<string, mixed>
+ */
+function prepare_entities_for_product_quick_action(array $entities, string $quickAction, string $rawMessage): array
+{
+    $quickAction = strtolower(trim($quickAction));
+    if ($quickAction === '') {
+        return $entities;
+    }
+
+    if ($quickAction === 'recommend_product') {
+        return reset_entities_for_generic_recommendation($entities);
+    }
+
+    if (!is_fresh_product_search_quick_action($quickAction)) {
+        return $entities;
+    }
+
+    $entities['_fresh_product_search'] = true;
+    unset($entities['_generic_recommend'], $entities['_cheaper_refinement']);
+
+    if ($quickAction === 'best_sellers') {
+        $entities['_best_sellers_request'] = true;
+        $entities['sort_by'] = 'best_sellers';
+        $entities['max_price'] = null;
+        $entities['min_price'] = null;
+        $entities['budget'] = ['min' => null, 'max' => null, 'currency' => 'USD'];
+        $entities['category_like'] = null;
+        $entities['product_type'] = null;
+        $entities['audience'] = null;
+        $entities['color'] = null;
+        $entities['size'] = null;
+        $entities['brand'] = null;
+        $entities['features'] = [];
+        $entities['keywords'] = [];
+        return $entities;
+    }
+
+    if ($quickAction === 'wireless_only') {
+        $entities['max_price'] = null;
+        $entities['min_price'] = null;
+        $entities['budget'] = ['min' => null, 'max' => null, 'currency' => 'USD'];
+        $entities['category_like'] = null;
+        $entities['product_type'] = null;
+        $entities['audience'] = null;
+        $entities['color'] = null;
+        $entities['size'] = null;
+        $entities['brand'] = null;
+        $entities['keywords'] = [];
+        $entities['features'] = ['wireless'];
+        $entities['_wireless_refinement'] = true;
+        return $entities;
+    }
+
+    if ($quickAction === 'under_100') {
+        $parsedBudget = parse_shopping_budget($rawMessage);
+        if ($parsedBudget['max_price_usd'] !== null) {
+            $entities['max_price'] = $parsedBudget['max_price_usd'];
+            $entities['budget']['max'] = $parsedBudget['max_amount'];
+            $entities['budget']['max_usd'] = $parsedBudget['max_price_usd'];
+            $entities['budget']['currency'] = $parsedBudget['currency'];
+            $entities['sort_by'] = 'price_asc';
+        }
+        $entities['category_like'] = null;
+        $entities['product_type'] = null;
+        $entities['features'] = [];
+        $entities['keywords'] = [];
+        return $entities;
+    }
+
     return $entities;
 }
 

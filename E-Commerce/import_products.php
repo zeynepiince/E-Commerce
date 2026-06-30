@@ -120,6 +120,40 @@ function infer_category_id(PDO $pdo, ?string $subCategory, ?string $apiCategory 
 }
 
 /**
+ * Kadın giyim sinyalleri erkek kategorisinde yanlış eşleşmeyi önler (ör. "Short Frock" → dress, men/pants değil).
+ */
+function infer_womens_clothing_subcategory_override(string $nameHay, string $fullHay): ?string
+{
+    if ($nameHay === '' && $fullHay === '') {
+        return null;
+    }
+
+    foreach (['frock', 'gown', 'sundress', 'maxi dress', 'evening dress', 'cocktail dress', 'party dress'] as $signal) {
+        if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+            return 'dress';
+        }
+    }
+
+    foreach (['skirt', 'corset'] as $signal) {
+        if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+            return 'skirts';
+        }
+    }
+
+    $combined = trim($nameHay . ' ' . $fullHay);
+    if ((classification_keyword_matches('dress', $nameHay) || classification_keyword_matches('dress', $fullHay))
+        && !preg_match('/\b(dress shirt|shirt dress)\b/i', $combined)) {
+        return 'dress';
+    }
+
+    if (classification_keyword_matches('blouse', $nameHay) || classification_keyword_matches('blouse', $fullHay)) {
+        return 'blouse';
+    }
+
+    return null;
+}
+
+/**
  * Ana kategori + ürün adı (+ açıklama) bilgisinden sub_category tahmin eder.
  * Site navigasyonundaki slug'larla aynı değerleri döner (women/dress, men/shirt, electronics/phone vs.).
  */
@@ -146,6 +180,11 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
         $cat = $catAliases[$cat];
     }
 
+    $womenOverride = infer_womens_clothing_subcategory_override($nameHay, $fullHay);
+    if ($womenOverride !== null) {
+        return $womenOverride;
+    }
+
     $rules = [
         'women' => [
             'women-shoes'        => ['heel', 'pump', 'ballet flat', 'stiletto', 'wedge', 'women.*shoe', 'women.*sneaker'],
@@ -160,7 +199,7 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
             'men-shoes'          => ['sneaker', 'oxford', 'derby', 'loafer', 'cleats', 'cleat', 'trainers', 'air jordan', 'nike air', 'baseball cleats', 'baseball cleat'],
             'men-accessories'    => ['tie', 'cufflink', 'belt', 'wallet', 'sunglasses', 'cap', 'hat'],
             'shirt'              => ['shirt', 'tshirt', 't-shirt', 'tee', 'polo', 'henley'],
-            'pants'              => ['pant', 'jean', 'trouser', 'chino', 'short', 'jogger', 'slim fit', 'casual fit'],
+            'pants'              => ['pant', 'jean', 'trouser', 'chino', 'shorts', 'bermuda', 'jogger', 'slim fit', 'casual fit'],
             'jacket'             => ['jacket', 'coat', 'blazer', 'hoodie', 'sweatshirt', 'parka', 'bomber'],
         ],
         'electronics' => [
