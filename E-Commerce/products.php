@@ -48,18 +48,16 @@ $sql = "
 ";
 $params = [];
 
-if ($selectedCategory !== '') {
+if ($selectedCategory !== '' && $selectedSubCategory === '') {
     $catSlug = normalize_category_slug($selectedCategory);
-    if ($catSlug === 'food') {
-        if ($selectedSubCategory === '') {
-            $foodSubs = function_exists('food_grocery_subcategories')
-                ? food_grocery_subcategories()
-                : ['snacks', 'beverages', 'gourmet'];
-            $placeholders = implode(',', array_fill(0, count($foodSubs), '?'));
-            $sql .= " AND LOWER(p.sub_category) IN ($placeholders)";
-            foreach ($foodSubs as $sub) {
-                $params[] = strtolower($sub);
-            }
+    $navSubs = function_exists('catalog_subcategories_for_nav_slug')
+        ? catalog_subcategories_for_nav_slug($catSlug)
+        : ($catSlug === 'food' ? ['snacks', 'beverages', 'gourmet'] : []);
+    if (!empty($navSubs)) {
+        $placeholders = implode(',', array_fill(0, count($navSubs), '?'));
+        $sql .= " AND LOWER(p.sub_category) IN ($placeholders)";
+        foreach ($navSubs as $sub) {
+            $params[] = strtolower($sub);
         }
     } else {
         $aliases = db_category_aliases($catSlug);

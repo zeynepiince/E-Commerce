@@ -34,3 +34,24 @@ WHERE NOT EXISTS (SELECT 1 FROM categories WHERE LOWER(category_name) = 'food' L
 
 UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
 WHERE LOWER(COALESCE(sub_category, '')) IN ('snacks', 'beverages', 'gourmet');
+
+-- Groceries misclassified under Home (no/wrong sub_category).
+UPDATE products SET sub_category = 'snacks', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
+WHERE LOWER(name) REGEXP '(potato|onion|cucumber|tomato|carrot|cabbage|lettuce|broccoli|garlic|ginger|avocado|banana|strawberry|kiwi|mulberry|rice|pasta|flour|bread|cheese|popcorn|cereal)'
+AND LOWER(COALESCE(sub_category, '')) NOT IN ('snacks', 'beverages', 'gourmet');
+
+UPDATE products SET sub_category = 'beverages', category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'food' LIMIT 1)
+WHERE LOWER(name) REGEXP '(cola|coke|pepsi|sprite|fanta|soda|juice|lemonade|mineral water|sparkling water|beer|wine|milk|smoothie|energy drink|soft drink)'
+AND LOWER(COALESCE(sub_category, '')) NOT IN ('snacks', 'beverages', 'gourmet');
+
+-- Beauty / sports / pet etc. → correct category_id from sub_category (site nav uses sub_category parent).
+UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'home' LIMIT 1)
+WHERE LOWER(sub_category) IN ('perfume', 'makeup', 'hair', 'skincare', 'kitchen', 'bedding', 'decor', 'furniture', 'books', 'fiction', 'non-fiction', 'kids-books', 'education', 'pet-food', 'pet-toys', 'dog', 'cat', 'stationery', 'desk', 'office-supplies', 'outdoor-plants', 'garden-tools', 'outdoor-furniture', 'vitamins', 'medical', 'wellness', 'baby-toys', 'baby-care', 'baby-clothing', 'art-materials', 'craft-supplies', 'sewing');
+
+UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'fashion' LIMIT 1)
+WHERE LOWER(sub_category) IN ('running', 'cycling', 'fitness', 'outdoor', 'kids-toys', 'kids-clothing', 'games', 'school', 'puzzles', 'board-games', 'educational-toys', 'action-figures', 'car-electronics', 'car-care', 'car-accessories');
+
+UPDATE products SET category_id = (SELECT category_id FROM categories WHERE LOWER(category_name) = 'electronics' LIMIT 1)
+WHERE LOWER(sub_category) IN ('smartwatch', 'headphones', 'gadgets-accessories');
+
+-- Full reclassification: import_products.php?backfill_subcat=1&force=1

@@ -53,32 +53,64 @@ function classification_keyword_matches(string $keyword, string $haystack): bool
  */
 function sub_category_parent_slug(?string $subCategory): ?string
 {
-    static $map = [
-        'women-shoes' => 'women', 'women-accessories' => 'women', 'bags' => 'women',
-        'dress' => 'women', 'blouse' => 'women', 'skirts' => 'women',
-        'men-shoes' => 'men', 'men-accessories' => 'men', 'shirt' => 'men',
-        'pants' => 'men', 'jacket' => 'men',
-        'phone' => 'electronics', 'computer-tablet' => 'electronics', 'smart-home' => 'electronics',
-        'tv' => 'electronics', 'speakers' => 'electronics', 'camera' => 'electronics', 'printer' => 'electronics',
-        'kitchen' => 'home', 'bedding' => 'home', 'decor' => 'home', 'furniture' => 'home',
-        'perfume' => 'beauty', 'makeup' => 'beauty', 'hair' => 'beauty', 'skincare' => 'beauty',
-        'running' => 'sports', 'cycling' => 'sports', 'fitness' => 'sports', 'outdoor' => 'sports',
-        'kids-toys' => 'kids', 'kids-clothing' => 'kids', 'games' => 'kids', 'school' => 'kids',
-        'puzzles' => 'toys', 'board-games' => 'toys', 'educational-toys' => 'toys', 'action-figures' => 'toys',
-        'smartwatch' => 'gadgets', 'headphones' => 'gadgets', 'gadgets-accessories' => 'gadgets',
-        'kids-books' => 'books', 'non-fiction' => 'books', 'fiction' => 'books', 'education' => 'books',
-        'watches' => 'jewelry', 'rings' => 'jewelry', 'necklaces' => 'jewelry', 'bracelets' => 'jewelry', 'earrings' => 'jewelry',
-        'pet-food' => 'pet', 'pet-toys' => 'pet', 'dog' => 'pet', 'cat' => 'pet',
-        'car-electronics' => 'auto', 'car-care' => 'auto', 'car-accessories' => 'auto',
-        'stationery' => 'office', 'desk' => 'office', 'office-supplies' => 'office',
-        'outdoor-plants' => 'garden', 'garden-tools' => 'garden', 'outdoor-furniture' => 'garden',
-        'vitamins' => 'health', 'medical' => 'health', 'wellness' => 'health',
-        'baby-toys' => 'baby', 'baby-care' => 'baby', 'baby-clothing' => 'baby',
-        'beverages' => 'food', 'snacks' => 'food', 'gourmet' => 'food',
-        'art-materials' => 'arts', 'craft-supplies' => 'arts', 'sewing' => 'arts',
+    return function_exists('catalog_nav_slug_for_subcategory')
+        ? catalog_nav_slug_for_subcategory($subCategory)
+        : null;
+}
+
+/**
+ * Ürün adından gıda / içecek alt kategorisi (patates, kola vb. Home'da kalmasın).
+ */
+function infer_food_subcategory_from_name(string $nameHay, string $fullHay, bool $allowAmbiguous = false): ?string
+{
+    if ($nameHay === '' && $fullHay === '') {
+        return null;
+    }
+
+    if (preg_match('/\b(laptop|macbook|iphone|ipad|airpod|smartphone|tablet|monitor|keyboard|mouse|charger|cable)\b/i', $fullHay)) {
+        return null;
+    }
+
+    $beverageSignals = [
+        'cola', 'coke', 'pepsi', 'sprite', 'fanta', 'soda', 'soft drink', 'energy drink',
+        'juice', 'lemonade', 'iced tea', 'mineral water', 'sparkling water', 'beer', 'wine',
+        'whisky', 'whiskey', 'vodka', 'milk', 'yogurt drink', 'smoothie',
     ];
-    $sub = strtolower(trim((string) $subCategory));
-    return $map[$sub] ?? null;
+    $snackSignals = [
+        'potato', 'onion', 'cucumber', 'tomato', 'carrot', 'cabbage', 'lettuce',
+        'broccoli', 'garlic', 'ginger', 'avocado', 'banana', 'strawberry', 'kiwi', 'mulberry', 'lemon',
+        'rice', 'pasta', 'flour', 'sugar', 'bread', 'cheese', 'butter', 'yogurt',
+        'nuts', 'almond', 'walnut', 'hazelnut', 'chips', 'cracker', 'popcorn', 'cereal', 'oats',
+    ];
+    $ambiguousSnackSignals = ['pepper', 'egg', 'apple', 'orange', 'grape', 'fruit', 'vegetable', 'produce', 'grocery'];
+    $gourmetSignals = [
+        'chocolate', 'honey', 'jam', 'olive oil', 'truffle', 'protein powder', 'gourmet',
+    ];
+
+    foreach ($beverageSignals as $signal) {
+        if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+            return 'beverages';
+        }
+    }
+    foreach ($gourmetSignals as $signal) {
+        if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+            return 'gourmet';
+        }
+    }
+    foreach ($snackSignals as $signal) {
+        if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+            return 'snacks';
+        }
+    }
+    if ($allowAmbiguous) {
+        foreach ($ambiguousSnackSignals as $signal) {
+            if (classification_keyword_matches($signal, $nameHay) || classification_keyword_matches($signal, $fullHay)) {
+                return 'snacks';
+            }
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -183,6 +215,12 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
     $womenOverride = infer_womens_clothing_subcategory_override($nameHay, $fullHay);
     if ($womenOverride !== null) {
         return $womenOverride;
+    }
+
+    $groceryCats = ['home', 'food', 'groceries', 'grocery', ''];
+    $foodHit = infer_food_subcategory_from_name($nameHay, $fullHay, in_array($cat, $groceryCats, true));
+    if ($foodHit !== null) {
+        return $foodHit;
     }
 
     $rules = [
@@ -292,9 +330,9 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
             'baby-clothing'      => ['baby', 'infant', 'onesie', 'romper', 'newborn'],
         ],
         'food' => [
-            'beverages'          => ['beverage', 'drink', 'juice', 'soda', 'coffee', 'tea', 'water', 'milk'],
-            'snacks'             => ['snack', 'chip', 'cracker', 'bar', 'nuts', 'rice', 'egg', 'cucumber', 'pepper', 'onion', 'kiwi', 'lemon', 'mulberry', 'strawberry', 'potato', 'fruit', 'vegetable'],
-            'gourmet'            => ['gourmet', 'chocolate', 'honey', 'jam', 'olive', 'protein powder'],
+            'beverages'          => ['beverage', 'drink', 'juice', 'soda', 'cola', 'coke', 'pepsi', 'coffee', 'tea', 'water', 'milk', 'beer', 'wine', 'lemonade'],
+            'snacks'             => ['snack', 'chip', 'cracker', 'bar', 'nuts', 'rice', 'egg', 'cucumber', 'pepper', 'onion', 'kiwi', 'lemon', 'mulberry', 'strawberry', 'potato', 'tomato', 'carrot', 'fruit', 'vegetable', 'produce', 'grocery', 'banana', 'apple', 'orange', 'bread', 'cheese', 'pasta', 'flour'],
+            'gourmet'            => ['gourmet', 'chocolate', 'honey', 'jam', 'olive', 'protein powder', 'truffle'],
         ],
         'arts' => [
             'art-materials'      => ['paint', 'canvas', 'brush', 'sketch', 'easel'],
@@ -332,8 +370,8 @@ function infer_subcategory(?string $categoryName, string $productName, ?string $
 
     // Ürün adı önce; kitap anahtar kelimeleri (history vb.) açıklamada yanlış eşleşmesin diye books en sonda.
     $crossParentOrder = [
-        'jewelry', 'electronics', 'home', 'beauty', 'men', 'women', 'food', 'pet',
-        'sports', 'gadgets', 'kids', 'toys', 'auto', 'office', 'garden', 'health', 'baby', 'arts', 'books',
+        'food', 'jewelry', 'electronics', 'beauty', 'men', 'women', 'pet',
+        'sports', 'gadgets', 'kids', 'toys', 'auto', 'office', 'garden', 'health', 'baby', 'arts', 'home', 'books',
     ];
     if ($cat !== '' && isset($rules[$cat])) {
         $crossParentOrder = array_values(array_diff($crossParentOrder, [$cat]));
@@ -562,7 +600,8 @@ function resolve_category_id(PDO $pdo, string $apiCategory): ?int
         "men's clothing"   => ['men', 'mens', 'mens-shirts', 'mens-shoes'],
         'electronics'      => ['electronic', 'smartphones', 'laptops', 'tablets', 'mobile-accessories'],
         'jewelery'         => ['jewelry', 'jewellery', 'womens-jewellery', 'mens-watches', 'womens-watches', 'watches'],
-        'home'             => ['home-decoration', 'furniture', 'kitchen-accessories', 'home-appliances', 'groceries', 'beauty', 'fragrances', 'skin-care', 'skincare'],
+        'food'             => ['groceries', 'grocery', 'food'],
+        'home'             => ['home-decoration', 'furniture', 'kitchen-accessories', 'home-appliances', 'beauty', 'fragrances', 'skin-care', 'skincare'],
         'fashion'          => ['vehicle', 'motorcycle', 'sports-accessories', 'sports', 'sportswear'],
     ];
     foreach ($aliases as $dbCat => $apiKeys) {

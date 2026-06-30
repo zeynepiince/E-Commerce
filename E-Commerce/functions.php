@@ -386,15 +386,81 @@ function normalize_category_slug(?string $raw): string
     return $map[$v] ?? $v;
 }
 
+/**
+ * Alt kategori slug → site navigasyon ana slug'ı (women, food, sports, …).
+ * import_products.php sınıflandırması ve products.php filtrelemesi bunu kullanır.
+ */
+function catalog_subcategory_parent_map(): array
+{
+    return [
+        'women-shoes' => 'women', 'women-accessories' => 'women', 'bags' => 'women',
+        'dress' => 'women', 'blouse' => 'women', 'skirts' => 'women',
+        'men-shoes' => 'men', 'men-accessories' => 'men', 'shirt' => 'men',
+        'pants' => 'men', 'jacket' => 'men',
+        'phone' => 'electronics', 'computer-tablet' => 'electronics', 'smart-home' => 'electronics',
+        'tv' => 'electronics', 'speakers' => 'electronics', 'camera' => 'electronics', 'printer' => 'electronics',
+        'kitchen' => 'home', 'bedding' => 'home', 'decor' => 'home', 'furniture' => 'home',
+        'perfume' => 'beauty', 'makeup' => 'beauty', 'hair' => 'beauty', 'skincare' => 'beauty',
+        'running' => 'sports', 'cycling' => 'sports', 'fitness' => 'sports', 'outdoor' => 'sports',
+        'kids-toys' => 'kids', 'kids-clothing' => 'kids', 'games' => 'kids', 'school' => 'kids',
+        'puzzles' => 'toys', 'board-games' => 'toys', 'educational-toys' => 'toys', 'action-figures' => 'toys',
+        'smartwatch' => 'gadgets', 'headphones' => 'gadgets', 'gadgets-accessories' => 'gadgets',
+        'kids-books' => 'books', 'non-fiction' => 'books', 'fiction' => 'books', 'education' => 'books',
+        'watches' => 'jewelry', 'rings' => 'jewelry', 'necklaces' => 'jewelry', 'bracelets' => 'jewelry', 'earrings' => 'jewelry',
+        'pet-food' => 'pet', 'pet-toys' => 'pet', 'dog' => 'pet', 'cat' => 'pet',
+        'car-electronics' => 'auto', 'car-care' => 'auto', 'car-accessories' => 'auto',
+        'stationery' => 'office', 'desk' => 'office', 'office-supplies' => 'office',
+        'outdoor-plants' => 'garden', 'garden-tools' => 'garden', 'outdoor-furniture' => 'garden',
+        'vitamins' => 'health', 'medical' => 'health', 'wellness' => 'health',
+        'baby-toys' => 'baby', 'baby-care' => 'baby', 'baby-clothing' => 'baby',
+        'beverages' => 'food', 'snacks' => 'food', 'gourmet' => 'food',
+        'art-materials' => 'arts', 'craft-supplies' => 'arts', 'sewing' => 'arts',
+    ];
+}
+
+function catalog_nav_slug_for_subcategory(?string $subCategory): ?string
+{
+    $sub = strtolower(trim((string) $subCategory));
+    if ($sub === '') {
+        return null;
+    }
+    $map = catalog_subcategory_parent_map();
+    return $map[$sub] ?? null;
+}
+
+/** @return string[] */
+function catalog_subcategories_for_nav_slug(string $navSlug): array
+{
+    $navSlug = strtolower(trim($navSlug));
+    if ($navSlug === '') {
+        return [];
+    }
+    $subs = [];
+    foreach (catalog_subcategory_parent_map() as $sub => $parent) {
+        if ($parent === $navSlug) {
+            $subs[] = $sub;
+        }
+    }
+    return $subs;
+}
+
 /** Grocery / food catalog sub-categories (site slug: food). */
 function food_grocery_subcategories(): array
 {
-    return ['snacks', 'beverages', 'gourmet'];
+    return catalog_subcategories_for_nav_slug('food');
 }
 
 function is_food_grocery_subcategory(?string $subCategory): bool
 {
     return in_array(strtolower(trim((string) $subCategory)), food_grocery_subcategories(), true);
+}
+
+/**
+ * Nav slug alt kategori listesiyle filtreleniyorsa true (food, sports, beauty, …).
+ */
+function catalog_nav_uses_subcategory_filter(string $navSlug): bool
+{
+    return catalog_subcategories_for_nav_slug($navSlug) !== [];
 }
 
 /**
@@ -410,7 +476,6 @@ function db_category_aliases(string $slug): array
         "women"   => ["women", "women's clothing", "womens clothing"],
         "men"     => ["men", "men's clothing", "mens clothing"],
         "jewelry" => ["jewelry", "jewelery", "jewellery"],
-        "food"    => ["food", "home"],
     ];
     return $reverse[$slug] ?? [$slug];
 }

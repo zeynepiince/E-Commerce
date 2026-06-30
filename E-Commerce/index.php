@@ -125,11 +125,9 @@ $selectedCategory = $_GET['category'] ?? '';
             // DB'deki kategori adını ("women's clothing", "Jewelery"...) site slug'ına
             // ("women", "jewelry") indir; aynı kategori ayrı satırlarda görünmesin.
             $sub = strtolower(trim($row['sub_category'] ?? ''));
-            if (function_exists('is_food_grocery_subcategory') && is_food_grocery_subcategory($sub)) {
-                $cat = 'food';
-            } else {
-                $cat = normalize_category_slug($row['category_name'] ?? '');
-            }
+            $cat = function_exists('catalog_nav_slug_for_subcategory')
+                ? (catalog_nav_slug_for_subcategory($sub) ?? normalize_category_slug($row['category_name'] ?? ''))
+                : normalize_category_slug($row['category_name'] ?? '');
 
             if ($cat === '') {
                 continue;
