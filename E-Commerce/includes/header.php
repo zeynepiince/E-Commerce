@@ -52,7 +52,7 @@ $loggedInName = $_SESSION['user_name'] ?? null;
   <link rel="stylesheet" href="<?= htmlspecialchars(asset_url('assets/css/checkout.css'), ENT_QUOTES, 'UTF-8') ?>?v=<?= urlencode((string) @filemtime(__DIR__ . '/../assets/css/checkout.css')) ?>">
   <?php endif; ?>
 </head>
-<body>
+<body data-user-logged-in="<?= !empty($_SESSION['user_id']) ? '1' : '0' ?>">
 
 <header class="elegant-header">
   <button type="button" class="nav-hamburger" onclick="toggleNavMenu()" aria-label="<?= htmlspecialchars(t("nav.menu", "Menu"), ENT_QUOTES, 'UTF-8') ?>">☰</button>

@@ -539,12 +539,14 @@ function syncFavoriteIdsCookie() {
 
 function hydrateHomeRecommendations() {
   const grid = document.getElementById("ai-recommended-grid");
-  if (!grid || !Array.isArray(favorites) || favorites.length === 0) return;
+  if (!grid) return;
 
   const ids = favorites
     .map((f) => Number(f.id))
     .filter((id) => Number.isFinite(id) && id > 0);
-  if (!ids.length) return;
+
+  const loggedIn = document.body && document.body.dataset.userLoggedIn === "1";
+  if (!loggedIn && ids.length === 0) return;
 
   fetch(appUrl("recommended_api.php"), {
     method: "POST",
